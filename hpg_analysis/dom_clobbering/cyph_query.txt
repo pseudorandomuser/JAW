@@ -1,0 +1,7 @@
+MATCH (win {Type: "Identifier", Code: "window"})
+	<-[:AST_parentOf*]-({Type: "LogicalExpression", Code: "||"})
+	<-[:AST_parentOf*]-(decl_expr {Type: "VariableDeclaration"})
+	-[:PDG_parentOf*]->(call_expr {Type: "ExpressionStatement"})
+	-[:AST_parentOf]->({Type: "CallExpression"})
+	-[:AST_parentOf*]->({Type: "Identifier", Code: "appendChild"}) 
+RETURN decl_expr;
