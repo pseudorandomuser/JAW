@@ -20,5 +20,6 @@ if __name__ == '__main__':
                 slices = data_flow._get_varname_value_from_context(transaction, call_arg['Code'], expr_stmt)
                 for i in range(0, len(slices)):
                     current_slice = slices[i]
-                    if 'window.' in current_slice[0]:
-                        print('DOM clobbering source found in document.*.appendChild() sink: %s (%s)' % (current_slice[0],str(current_slice[3])))
+                    print('%d.\t%s' % (i, repr(current_slice)))
+                    '''if 'window.' in current_slice[0]:
+                        print('DOM clobbering source found in document.*.appendChild() sink: %s (%s)' % (current_slice[0],str(current_slice[3])))'''
