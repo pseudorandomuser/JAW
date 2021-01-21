@@ -1,9 +1,16 @@
 import re
+import os
+import sys
 import ast
-import constants
 
 from neo4j import GraphDatabase
 
+#Add JAW root to path for imports
+sys.path.append(os.path.join(
+    os.path.dirname(sys.argv[0]), f'..{os.path.sep}..'
+))
+
+import constants
 from hpg_analysis.general.control_flow import do_reachability_analysis
 from hpg_analysis.general.data_flow import _get_varname_value_from_context
 
@@ -33,22 +40,23 @@ def get_eval_sinks(transaction):
 
 def print_report(vulnerabilities):
 
-    report_header = '###################################\n# DOM Clobbering Analysis Results #\n###################################'
+    report_header = '''
+###################################
+# DOM Clobbering Analysis Results #
+###################################'''
 
     vulnerability_str = ''
     for sink, code, location in vulnerabilities:
-        location_regex = re.match('{start:{line:([0-9]*),column:([0-9]*)},end:{line:([0-9]*),column:([0-9]*)}}', location)
+        location_regex = re.match('{start:{line:([0-9]+),column:([0-9]+)},end:{line:([0-9]+),column:([0-9]+)}}', location)
         start_line, start_col, end_line, end_col = location_regex.groups()
-        vulnerability_str += f'\nLocation:\tLine {start_line} column {start_col}:'
-        vulnerability_str += f'\nSink type:\t{sink}\nSource code:\t{code}\n'
+        vulnerability_str += f'\nLocation:\tLine {start_line} column {start_col}\nSink type:\t{sink}\nSource code:\t{code}\n'
 
-    assessment_str = f'Final assessment: {len(vulnerabilities)} Vulnerabilities were found.\n'
-    if len(vulnerabilities) > 0:
-        assessment_str += 'Action needs to be taken.'
-    else:
-        assessment_str += 'No action is required.'
+    vulnerabilities_len = len(vulnerabilities)
+    assessment_str = f'Final assessment: {vulnerabilities_len} ' \
+        + f'Vulnerabilit{"ies were" if vulnerabilities_len > 1 else "y was"} found.\n' \
+        + f'{"A" if vulnerabilities_len > 0 else "No a"}ction needs to be taken.'
 
-    print(f'{report_header}\n{vulnerability_str}\n{assessment_str}')
+    print(f'{report_header}\n{vulnerability_str}\n{assessment_str}\n')
 
 
 if __name__ == '__main__':

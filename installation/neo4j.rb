@@ -15,7 +15,7 @@ class Neo4j < Formula
   # https://github.com/neo4j/neo4j/issues/11728#issuecomment-387038804
   # https://github.com/neo4j/neo4j-browser/issues/671#issuecomment-346224754
   # https://github.com/Homebrew/homebrew-core/issues/31090
-  depends_on :java => "1.8"
+  depends_on "openjdk@8"
 
   def install
     ENV["NEO4J_HOME"] = libexec
