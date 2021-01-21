@@ -25,7 +25,7 @@ def get_document_append_child_sinks(tx):
         RETURN  expr_node, args_node;'''
     return [(r['expr_node'], r['args_node']['Code']) for r in tx.run(query)]
 
-def get_eval_sinks(transaction):
+def get_eval_sinks(tx):
     query = '''MATCH   (expr_node {Type: "ExpressionStatement"})
                     -[:AST_parentOf {RelationType: "expression"}]->(call_expr {Type: "CallExpression"})
                     -[:AST_parentOf {RelationType: "callee"}]->(callee {Type: "Identifier", Code: "eval"}),
