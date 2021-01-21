@@ -64,11 +64,12 @@ if __name__ == '__main__':
             vulnerabilities = []
 
             # Analysis of document.*.appendChild() sinks
-
+            
             for expr_node, arg in get_document_append_child_sinks(transaction):
-                if do_reachability_analysis(transaction, expr_node.id, input_is_top=False) == 'unreachable': 
+
+                if do_reachability_analysis(transaction, node_id=expr_node.id) == 'unreachable': 
                     continue
-                
+
                 src_code = None
                 src_location = None
                 script_created = False
@@ -86,11 +87,15 @@ if __name__ == '__main__':
                     vulnerabilities.append(('document.appendChild()', src_code, src_location))
 
             for expr_node, arg in get_eval_sinks(transaction):
-                #if do_reachability_analysis(transaction, expr_node, input_is_top=True) == 'unreachable': 
-                #    print('unreachable')
-                #    continue
+                
+                '''reachability = do_reachability_analysis(transaction, node_id=expr_node.id)
+                if reachability == 'unreachable': 
+                    print(reachability)
+                    continue'''
 
-                for code, args, ids, location in _get_varname_value_from_context(transaction, arg, expr_node):
+                prog_slice = _get_varname_value_from_context(transaction, arg, expr_node)
+                print(repr(prog_slice))
+                for code, args, ids, location in prog_slice:
                     match_window = re.search('window\.(.*)', code)
                     if match_window is not None:
                         vulnerabilities.append(('eval()', code, location))

@@ -1,6 +1,6 @@
-function f(obj) {
-	eval(obj.code);
+function f(code) {
+	eval(code);
 };
 
 let myObject = window.myObject || { code: '' };
-f(myObject);
+f(myObject.code);
