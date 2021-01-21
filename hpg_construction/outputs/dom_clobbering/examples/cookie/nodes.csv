@@ -1,6 +1,6 @@
 Id:ID¿ Type¿ Kind¿ Code¿ Range¿ Location¿ Value¿ Raw¿ Async¿ Label:LABEL¿ SemanticType
-29¿ exit¿ ¿ ¿ ¿ ¿ ¿ ¿ ¿ ASTNode¿ 
-1¿ Program¿ ¿ ¿ [151,294]¿ {start:{line:2,column:0},end:{line:4,column:44}}¿ ¿ ¿ ¿ ASTNode¿ 
+33¿ exit¿ ¿ ¿ ¿ ¿ ¿ ¿ ¿ ASTNode¿ 
+1¿ Program¿ ¿ ¿ [151,325]¿ {start:{line:2,column:0},end:{line:5,column:30}}¿ ¿ ¿ ¿ ASTNode¿ 
 2¿ VariableDeclaration¿ let¿ ¿ [151,205]¿ {start:{line:2,column:0},end:{line:2,column:54}}¿ ¿ ¿ ¿ ASTNode¿ 
 3¿ VariableDeclarator¿ ¿ =¿ [155,204]¿ {start:{line:2,column:4},end:{line:2,column:53}}¿ ¿ ¿ ¿ ASTNode¿ 
 4¿ Identifier¿ ¿ myObject¿ [155,163]¿ {start:{line:2,column:4},end:{line:2,column:12}}¿ ¿ ¿ ¿ ASTNode¿ 
@@ -20,11 +20,15 @@ Id:ID¿ Type¿ Kind¿ Code¿ Range¿ Location¿ Value¿ Raw¿ Async¿ Label:LABE
 18¿ Identifier¿ ¿ JSON¿ [224,228]¿ {start:{line:3,column:18},end:{line:3,column:22}}¿ ¿ ¿ ¿ ASTNode¿ 
 19¿ Identifier¿ ¿ stringify¿ [229,238]¿ {start:{line:3,column:23},end:{line:3,column:32}}¿ ¿ ¿ ¿ ASTNode¿ 
 20¿ Identifier¿ ¿ myObject¿ [239,247]¿ {start:{line:3,column:33},end:{line:3,column:41}}¿ ¿ ¿ ¿ ASTNode¿ 
-21¿ ExpressionStatement¿ ¿ ¿ [250,294]¿ {start:{line:4,column:0},end:{line:4,column:44}}¿ ¿ ¿ ¿ ASTNode¿ 
-22¿ AssignmentExpression¿ ¿ =¿ [250,293]¿ {start:{line:4,column:0},end:{line:4,column:43}}¿ ¿ ¿ ¿ ASTNode¿ 
-23¿ MemberExpression¿ ¿ ¿ [250,265]¿ {start:{line:4,column:0},end:{line:4,column:15}}¿ ¿ ¿ ¿ ASTNode¿ 
-24¿ Identifier¿ ¿ document¿ [250,258]¿ {start:{line:4,column:0},end:{line:4,column:8}}¿ ¿ ¿ ¿ ASTNode¿ 
-25¿ Identifier¿ ¿ cookie¿ [259,265]¿ {start:{line:4,column:9},end:{line:4,column:15}}¿ ¿ ¿ ¿ ASTNode¿ 
-26¿ BinaryExpression¿ ¿ +¿ [268,293]¿ {start:{line:4,column:18},end:{line:4,column:43}}¿ ¿ ¿ ¿ ASTNode¿ 
-27¿ Literal¿ ¿ ¿ [268,279]¿ {start:{line:4,column:18},end:{line:4,column:29}}¿ settings=¿ settings=¿ ¿ ASTNode¿ 
-28¿ Identifier¿ ¿ settingsStr¿ [282,293]¿ {start:{line:4,column:32},end:{line:4,column:43}}¿ ¿ ¿ ¿ ASTNode¿ 
+21¿ VariableDeclaration¿ let¿ ¿ [250,294]¿ {start:{line:4,column:0},end:{line:4,column:44}}¿ ¿ ¿ ¿ ASTNode¿ 
+22¿ VariableDeclarator¿ ¿ =¿ [254,293]¿ {start:{line:4,column:4},end:{line:4,column:43}}¿ ¿ ¿ ¿ ASTNode¿ 
+23¿ Identifier¿ ¿ cookie_data¿ [254,265]¿ {start:{line:4,column:4},end:{line:4,column:15}}¿ ¿ ¿ ¿ ASTNode¿ 
+24¿ BinaryExpression¿ ¿ +¿ [268,293]¿ {start:{line:4,column:18},end:{line:4,column:43}}¿ ¿ ¿ ¿ ASTNode¿ 
+25¿ Literal¿ ¿ ¿ [268,279]¿ {start:{line:4,column:18},end:{line:4,column:29}}¿ settings=¿ settings=¿ ¿ ASTNode¿ 
+26¿ Identifier¿ ¿ settingsStr¿ [282,293]¿ {start:{line:4,column:32},end:{line:4,column:43}}¿ ¿ ¿ ¿ ASTNode¿ 
+27¿ ExpressionStatement¿ ¿ ¿ [295,325]¿ {start:{line:5,column:0},end:{line:5,column:30}}¿ ¿ ¿ ¿ ASTNode¿ 
+28¿ AssignmentExpression¿ ¿ =¿ [295,324]¿ {start:{line:5,column:0},end:{line:5,column:29}}¿ ¿ ¿ ¿ ASTNode¿ 
+29¿ MemberExpression¿ ¿ ¿ [295,310]¿ {start:{line:5,column:0},end:{line:5,column:15}}¿ ¿ ¿ ¿ ASTNode¿ 
+30¿ Identifier¿ ¿ document¿ [295,303]¿ {start:{line:5,column:0},end:{line:5,column:8}}¿ ¿ ¿ ¿ ASTNode¿ 
+31¿ Identifier¿ ¿ cookie¿ [304,310]¿ {start:{line:5,column:9},end:{line:5,column:15}}¿ ¿ ¿ ¿ ASTNode¿ 
+32¿ Identifier¿ ¿ cookie_data¿ [313,324]¿ {start:{line:5,column:18},end:{line:5,column:29}}¿ ¿ ¿ ¿ ASTNode¿ 

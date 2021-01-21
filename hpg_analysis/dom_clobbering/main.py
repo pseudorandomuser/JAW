@@ -12,7 +12,7 @@ sys.path.append(os.path.join(
 
 import constants
 from hpg_analysis.general.control_flow import do_reachability_analysis
-from hpg_analysis.general.data_flow import _get_varname_value_from_context
+from hpg_analysis.general.data_flow import get_varname_value_from_context
 
 
 def get_document_append_child_sinks(tx):
@@ -74,7 +74,7 @@ if __name__ == '__main__':
                 src_location = None
                 script_created = False
 
-                for code, args, ids, location in _get_varname_value_from_context(transaction, arg, expr_node):
+                for code, args, ids, location in get_varname_value_from_context(arg, expr_node):
                     match_create = re.search('document\.createElement\([\'|"]([A-Za-z]*)[\'|"]\)', code)
                     match_window = re.search('window\.(.*)', code)
                     if match_create is not None:
@@ -88,13 +88,11 @@ if __name__ == '__main__':
 
             for expr_node, arg in get_eval_sinks(transaction):
                 
-                '''reachability = do_reachability_analysis(transaction, node_id=expr_node.id)
-                if reachability == 'unreachable': 
-                    print(reachability)
-                    continue'''
+                if do_reachability_analysis(transaction, node_id=expr_node.id) == 'unreachable': 
+                    print('unreachable')
+                    continue
 
-                prog_slice = _get_varname_value_from_context(transaction, arg, expr_node)
-                print(repr(prog_slice))
+                prog_slice = get_varname_value_from_context(arg, expr_node)
                 for code, args, ids, location in prog_slice:
                     match_window = re.search('window\.(.*)', code)
                     if match_window is not None:
