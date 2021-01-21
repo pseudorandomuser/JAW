@@ -14,29 +14,25 @@ import constants
 from hpg_analysis.general.control_flow import do_reachability_analysis
 from hpg_analysis.general.data_flow import _get_varname_value_from_context
 
-def get_document_append_child_sinks(transaction):
-    query = '''
-        MATCH   (expr_node {Type: "ExpressionStatement"})
+
+def get_document_append_child_sinks(tx):
+    query = '''MATCH   (expr_node {Type: "ExpressionStatement"})
                     -[:AST_parentOf {RelationType: "expression"}]->(call_expr {Type: "CallExpression"})
                     -[:AST_parentOf {RelationType: "callee"}]->(callee),
                 (call_expr)-[:AST_parentOf {RelationType: "arguments"}]->(args_node),
                 (callee)-[:AST_parentOf*2]->({Type: "Identifier", Code: "document"}),
                 (callee)-[:AST_parentOf]->({Type: "Identifier", Code: "appendChild"})
-        RETURN  expr_node, args_node;
-    '''
-    for result in transaction.run(query):
-        yield (result['expr_node'], result['args_node']['Code'])
+        RETURN  expr_node, args_node;'''
+    return [(r['expr_node'], r['args_node']['Code']) for r in tx.run(query)]
 
 def get_eval_sinks(transaction):
-    query = '''
-        MATCH   (expr_node {Type: "ExpressionStatement"})
+    query = '''MATCH   (expr_node {Type: "ExpressionStatement"})
                     -[:AST_parentOf {RelationType: "expression"}]->(call_expr {Type: "CallExpression"})
                     -[:AST_parentOf {RelationType: "callee"}]->(callee {Type: "Identifier", Code: "eval"}),
                 (call_expr)-[:AST_parentOf {RelationType: "arguments"}]->(args_node)
-        RETURN  expr_node, args_node;
-        '''
-    for result in transaction.run(query):
-        yield (result['expr_node'], result['args_node']['Code'])
+        RETURN  expr_node, args_node;'''
+    return [(r['expr_node'], r['args_node']['Code']) for r in tx.run(query)]
+
 
 def print_report(vulnerabilities):
 
