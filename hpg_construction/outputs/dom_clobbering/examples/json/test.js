@@ -1,3 +1,2 @@
-let myObject = window.myObject || { safe_mode: true };
-let settingsStr = JSON.stringify(myObject);
-document.cookie = "settings=" + settingsStr;
+let myObject = window.myObject || { json_value: '{}' };
+let settingsObj = JSON.parse(myObject.json_value);
