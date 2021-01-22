@@ -54,6 +54,17 @@ def get_eval_sinks(tx):
         RETURN  expr_node, args_node;'''
     return [(r['expr_node'], r['args_node']['Code']) for r in tx.run(query)]
 
+def get_json_sinks(tx):
+    query = '''MATCH   (decl_node {Type: "VariableDeclaration"})
+                    -[:AST_parentOf*2]->(call_expr {Type: "CallExpression"}),
+                (call_expr)-[:AST_parentOf {RelationType: "arguments"}]->(args_node {Type: "Identifier"}),
+                (call_expr)-[:AST_parentOf {RelationType: "callee"}]->(callee_node {Type: "MemberExpression"}),
+                (callee_node)-[:AST_parentOf {RelationType: "property"}]->({Type: "Identifier", Code: "parse"}),
+                (callee_node)-[:AST_parentOf {RelationType: "object"}]->({Type: "Identifier", Code: "JSON"})
+        RETURN decl_node, args_node;
+                '''
+    return [(r['decl_node'], r['args_node']['Code']) for r in tx.run(query)]
+
 
 
 
@@ -111,7 +122,8 @@ if __name__ == '__main__':
                 ('document.cookie', get_obj_property_sinks, ('document', 'cookie')),
                 ('document.domain', get_obj_property_sinks, ('document', 'domain')),
                 ('window.location', get_obj_property_sinks, ('window', 'location')),
-                ('innerHTML', get_property_sinks, ('innerHTML',))
+                ('innerHTML', get_property_sinks, ('innerHTML',)),
+                ('JSON.parse', get_json_sinks)
             ]
 
             for params in generic_queries:

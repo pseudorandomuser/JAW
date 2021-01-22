@@ -1,4 +1,6 @@
 (function() {
-    let myObject = window.myObject || { setting_val: 'legit_value' };
-    window.sessionStorage.setItem('hardcoded_key', myObject.setting_val);
+    let myObject = window.myObject || { setting_key: 'legit_key', setting_val: 'legit_value' };
+    let k = myObject.setting_key;
+    let v = myObject.setting_val;
+    localStorage.setItem(k, v);
 })();

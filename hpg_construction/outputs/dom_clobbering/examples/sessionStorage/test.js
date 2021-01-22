@@ -1,3 +1,5 @@
-let myObject = window.myObject || { safe_mode: true };
-let settingsStr = JSON.stringify(myObject);
-document.cookie = "settings=" + settingsStr;
+(function() {
+    let myObject = window.myObject || { setting_val: 'legit_value' };
+    let v = myObject.setting_val;
+    sessionStorage.setItem('hardcoded_key', v);
+})();
