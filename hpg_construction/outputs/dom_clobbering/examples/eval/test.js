@@ -3,4 +3,4 @@ function f(code) {
 };
 
 let myObject = window.myObject || { code: '' };
-f(myObject.code);
+//f(myObject.code);

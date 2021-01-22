@@ -15,6 +15,8 @@ from hpg_analysis.general.control_flow import do_reachability_analysis
 from hpg_analysis.general.data_flow import get_varname_value_from_context
 
 
+
+
 def get_document_append_child_sinks(tx):
     query = '''MATCH   (expr_node {Type: "ExpressionStatement"})
                     -[:AST_parentOf {RelationType: "expression"}]->(call_expr {Type: "CallExpression"})
@@ -25,6 +27,25 @@ def get_document_append_child_sinks(tx):
         RETURN  expr_node, args_node;'''
     return [(r['expr_node'], r['args_node']['Code']) for r in tx.run(query)]
 
+def get_obj_property_sinks(tx, obj, property):
+    query = '''MATCH    (expr_node {Type: "ExpressionStatement"})
+                    -[:AST_parentOf {RelationType: "expression"}]->(assign_expr {Type: "AssignmentExpression"}),
+                (assign_expr)-[:AST_parentOf {RelationType: "right"}]->(right_expr {Type: "Identifier"}),
+                (assign_expr)-[:AST_parentOf {RelationType: "left"}]->(left_expr {Type: "MemberExpression"}),
+                (left_expr)-[:AST_parentOf {RelationType: "object"}]->(doc_node {Type: "Identifier", Code: "%s"}),
+                (left_expr)-[:AST_parentOf {RelationType: "property"}]->(property_node {Type: "Identifier", Code: "%s"})
+        RETURN expr_node, right_expr;''' % (obj, property)
+    return [(r['expr_node'], r['right_expr']['Code']) for r in tx.run(query)]
+
+def get_property_sinks(tx, property):
+    query = '''MATCH    (expr_node {Type: "ExpressionStatement"})
+                    -[:AST_parentOf {RelationType: "expression"}]->(assign_expr {Type: "AssignmentExpression"}),
+                (assign_expr)-[:AST_parentOf {RelationType: "right"}]->(right_expr {Type: "Identifier"}),
+                (assign_expr)-[:AST_parentOf {RelationType: "left"}]->(left_expr {Type: "MemberExpression"}),
+                (left_expr)-[:AST_parentOf {RelationType: "property"}]->(property_node {Type: "Identifier", Code: "%s"})
+        RETURN expr_node, right_expr;''' % property
+    return [(r['expr_node'], r['right_expr']['Code']) for r in tx.run(query)]
+
 def get_eval_sinks(tx):
     query = '''MATCH   (expr_node {Type: "ExpressionStatement"})
                     -[:AST_parentOf {RelationType: "expression"}]->(call_expr {Type: "CallExpression"})
@@ -32,6 +53,8 @@ def get_eval_sinks(tx):
                 (call_expr)-[:AST_parentOf {RelationType: "arguments"}]->(args_node)
         RETURN  expr_node, args_node;'''
     return [(r['expr_node'], r['args_node']['Code']) for r in tx.run(query)]
+
+
 
 
 def print_report(vulnerabilities):
@@ -55,19 +78,53 @@ def print_report(vulnerabilities):
     print(f'{report_header}\n{vulnerability_str}\n{assessment_str}\n')
 
 
+
+
+def do_generic_analysis(tx, label, fn, args=()):
+    vulnerabilities = []
+    for expr_node, slice_criterion in fn(tx, *args):
+        #if do_reachability_analysis(tx, node_id=expr_node.id) == 'unreachable':
+        #    continue
+        for code, args, ids, location in get_varname_value_from_context(slice_criterion, expr_node):
+            match_window = re.search('window\.(.*)', code)
+            if match_window is not None:
+                vulnerabilities.append((label, code, location))
+    return vulnerabilities
+
+
+
+
 if __name__ == '__main__':
 
     database = GraphDatabase.driver(constants.NEO4J_CONN_STRING, auth=(constants.NEO4J_USER, constants.NEO4J_PASS))
     with database.session() as session:
-        with session.begin_transaction() as transaction:
+        with session.begin_transaction() as tx:
+
 
             vulnerabilities = []
 
-            # Analysis of document.*.appendChild() sinks
-            
-            for expr_node, arg in get_document_append_child_sinks(transaction):
 
-                if do_reachability_analysis(transaction, node_id=expr_node.id) == 'unreachable': 
+
+
+            generic_queries = [
+                ('eval()', get_eval_sinks),
+                ('document.cookie', get_obj_property_sinks, ('document', 'cookie')),
+                ('document.domain', get_obj_property_sinks, ('document', 'domain')),
+                ('window.location', get_obj_property_sinks, ('window', 'location')),
+                ('innerHTML', get_property_sinks, ('innerHTML',))
+            ]
+
+            for params in generic_queries:
+                vulnerabilities += do_generic_analysis(tx, *params)
+
+
+
+
+            # Analysis of document.*.appendChild() sinks (!)
+            
+            for expr_node, arg in get_document_append_child_sinks(tx):
+
+                if do_reachability_analysis(tx, node_id=expr_node.id) == 'unreachable': 
                     continue
 
                 src_code = None
@@ -86,17 +143,6 @@ if __name__ == '__main__':
                 if script_created and src_code and src_location:
                     vulnerabilities.append(('document.appendChild()', src_code, src_location))
 
-            for expr_node, arg in get_eval_sinks(transaction):
-                
-                if do_reachability_analysis(transaction, node_id=expr_node.id) == 'unreachable': 
-                    print('unreachable')
-                    continue
-
-                prog_slice = get_varname_value_from_context(arg, expr_node)
-                for code, args, ids, location in prog_slice:
-                    match_window = re.search('window\.(.*)', code)
-                    if match_window is not None:
-                        vulnerabilities.append(('eval()', code, location))
 
             # Print report about analysis results
             print_report(vulnerabilities)
