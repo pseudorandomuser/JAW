@@ -66,14 +66,14 @@ def get_json_sinks(tx):
 def get_storage_sinks(tx, storage_type):
 
     results = []
-
-    query = '''MATCH   (expr_node {Type: "ExpressionStatement"})
-                    -[:AST_parentOf {RelationType: "expression"}]->(call_expr {Type: "CallExpression"}),
+    query = '''MATCH   (expr_node)
+                    -[:AST_parentOf*1..2 {RelationType: "expression"}]->(call_expr {Type: "CallExpression"}),
                 (call_expr)-[:AST_parentOf {RelationType: "arguments", Arguments: '{"arg":0}'}]->(arg_node_key),
                 (call_expr)-[:AST_parentOf {RelationType: "arguments", Arguments: '{"arg":1}'}]->(arg_node_val),
                 (call_expr)-[:AST_parentOf {RelationType: "callee"}]->(callee_node {Type: "MemberExpression"}),
                 (callee_node)-[:AST_parentOf {RelationType: "property"}]->({Type: "Identifier", Code: "setItem"}),
                 (callee_node)-[:AST_parentOf {RelationType: "object"}]->({Type: "Identifier", Code: "%s"})
+        WHERE expr_node.Type = 'ExpressionStatement' OR expr_node.Type = 'VariableDeclaration'
         RETURN expr_node, arg_node_key, arg_node_val;
                 ''' % storage_type
 
@@ -119,9 +119,9 @@ def print_report(vulnerabilities):
 def do_generic_analysis(tx, label, fn, args=()):
     vulnerabilities = []
     for expr_node, slice_criterion in fn(tx, *args):
-        if do_reachability_analysis(tx, node_id=expr_node['Id']) == 'unreachable':
-            print('Warning: Unreachable node: %s' % repr(expr_node))
-            continue
+        #if do_reachability_analysis(tx, node_id=expr_node['Id']) == 'unreachable':
+        #    print('Warning: Unreachable node: %s' % repr(expr_node))
+        #    continue
         for code, args, ids, location in get_varname_value_from_context(slice_criterion, expr_node):
             match_window = re.search('window\.(.*)', code)
             if match_window is not None:
@@ -157,8 +157,8 @@ if __name__ == '__main__':
             
             for expr_node, arg in get_document_append_child_sinks(tx):
 
-                if do_reachability_analysis(tx, node_id=expr_node['Id']) == 'unreachable': 
-                    continue
+                #if do_reachability_analysis(tx, node=expr_node, input_is_top=) == 'unreachable': 
+                #    continue
 
                 src_code = None
                 src_location = None

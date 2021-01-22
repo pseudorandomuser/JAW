@@ -32,19 +32,16 @@
 import hpg_neo4j.query_utility as QU
 import hpg_neo4j.db_utility as DU
 
-#def do_reachability_analysis(tx, node, input_is_top=False):
-def do_reachability_analysis(tx, node=None, node_id=''):
+def do_reachability_analysis(tx, node, input_is_top=False):
 
 	# return values
 	NORMAL_PAGE_LOAD = 'onPageLoad' # reachable at page load
 	UNREACHABLE = 'unreachable' # not reachable
 
-	top_expression = (node if node else QU.get_ast_topmost(tx, {'Id': node_id}))
-
-	'''if input_is_top:
+	if input_is_top:
 		top_expression = node
 	else:
-		top_expression = QU.get_ast_topmost(tx, {'Id': node_id})'''
+		top_expression = QU.get_ast_topmost(tx, {'Id': node['Id']})
 	
 	query = """
 	MATCH (n { Id: '%s'})<-[:CFG_parentOf*]-(block_node)
