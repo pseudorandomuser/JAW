@@ -1,6 +1,6 @@
 (function() {
-    let myObject = window.myObject || { setting_key: 'legit_key', setting_val: 'legit_value' };
-    let k = myObject.setting_key;
-    let v = myObject.setting_val;
-    localStorage.setItem(k, v);
+    let myObjectK = window.myObject || { setting_key: 'legit_key' };
+    let myObjectV = window.myObject || { setting_val: 'legit_value' };
+    let k = myObjectK.setting_key;
+    localStorage.setItem(k, myObjectV.setting_val);
 })();

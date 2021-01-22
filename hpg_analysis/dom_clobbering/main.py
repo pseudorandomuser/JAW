@@ -25,7 +25,7 @@ def get_document_append_child_sinks(tx):
                 (callee)-[:AST_parentOf*2]->({Type: "Identifier", Code: "document"}),
                 (callee)-[:AST_parentOf]->({Type: "Identifier", Code: "appendChild"})
         RETURN  expr_node, args_node;'''
-    return [(r['expr_node'], r['args_node']['Code']) for r in tx.run(query)]
+    return [(r['expr_node'], get_topmost_object(tx, r['args_node'])['Code']) for r in tx.run(query)]
 
 def get_obj_property_sinks(tx, obj, property):
     query = '''MATCH    (expr_node {Type: "ExpressionStatement"})
@@ -35,16 +35,16 @@ def get_obj_property_sinks(tx, obj, property):
                 (left_expr)-[:AST_parentOf {RelationType: "object"}]->(doc_node {Type: "Identifier", Code: "%s"}),
                 (left_expr)-[:AST_parentOf {RelationType: "property"}]->(property_node {Type: "Identifier", Code: "%s"})
         RETURN expr_node, right_expr;''' % (obj, property)
-    return [(r['expr_node'], r['right_expr']['Code']) for r in tx.run(query)]
+    return [(r['expr_node'], get_topmost_object(tx, r['right_expr'])['Code']) for r in tx.run(query)]
 
 def get_property_sinks(tx, property):
     query = '''MATCH    (expr_node {Type: "ExpressionStatement"})
                     -[:AST_parentOf {RelationType: "expression"}]->(assign_expr {Type: "AssignmentExpression"}),
-                (assign_expr)-[:AST_parentOf {RelationType: "right"}]->(right_expr {Type: "Identifier"}),
+                (assign_expr)-[:AST_parentOf {RelationType: "right"}]->(right_expr),
                 (assign_expr)-[:AST_parentOf {RelationType: "left"}]->(left_expr {Type: "MemberExpression"}),
                 (left_expr)-[:AST_parentOf {RelationType: "property"}]->(property_node {Type: "Identifier", Code: "%s"})
         RETURN expr_node, right_expr;''' % property
-    return [(r['expr_node'], r['right_expr']['Code']) for r in tx.run(query)]
+    return [(r['expr_node'], get_topmost_object(tx, r['right_expr'])['Code']) for r in tx.run(query)]
 
 def get_eval_sinks(tx):
     query = '''MATCH   (expr_node {Type: "ExpressionStatement"})
@@ -52,20 +52,49 @@ def get_eval_sinks(tx):
                     -[:AST_parentOf {RelationType: "callee"}]->(callee {Type: "Identifier", Code: "eval"}),
                 (call_expr)-[:AST_parentOf {RelationType: "arguments"}]->(args_node)
         RETURN  expr_node, args_node;'''
-    return [(r['expr_node'], r['args_node']['Code']) for r in tx.run(query)]
+    return [(r['expr_node'], get_topmost_object(tx, r['args_node'])['Code']) for r in tx.run(query)]
 
 def get_json_sinks(tx):
     query = '''MATCH   (decl_node {Type: "VariableDeclaration"})
                     -[:AST_parentOf*2]->(call_expr {Type: "CallExpression"}),
-                (call_expr)-[:AST_parentOf {RelationType: "arguments"}]->(args_node {Type: "Identifier"}),
+                (call_expr)-[:AST_parentOf {RelationType: "arguments"}]->(args_node),
                 (call_expr)-[:AST_parentOf {RelationType: "callee"}]->(callee_node {Type: "MemberExpression"}),
                 (callee_node)-[:AST_parentOf {RelationType: "property"}]->({Type: "Identifier", Code: "parse"}),
                 (callee_node)-[:AST_parentOf {RelationType: "object"}]->({Type: "Identifier", Code: "JSON"})
         RETURN decl_node, args_node;
                 '''
-    return [(r['decl_node'], r['args_node']['Code']) for r in tx.run(query)]
+    return [(r['decl_node'], get_topmost_object(tx, r['args_node'])['Code']) for r in tx.run(query)]
+
+def get_storage_sinks(tx, storage_type):
+
+    results = []
+
+    query = '''MATCH   (expr_node {Type: "ExpressionStatement"})
+                    -[:AST_parentOf {RelationType: "expression"}]->(call_expr {Type: "CallExpression"}),
+                (call_expr)-[:AST_parentOf {RelationType: "arguments", Arguments: '{"arg":0}'}]->(arg_node_key),
+                (call_expr)-[:AST_parentOf {RelationType: "arguments", Arguments: '{"arg":1}'}]->(arg_node_val),
+                (call_expr)-[:AST_parentOf {RelationType: "callee"}]->(callee_node {Type: "MemberExpression"}),
+                (callee_node)-[:AST_parentOf {RelationType: "property"}]->({Type: "Identifier", Code: "setItem"}),
+                (callee_node)-[:AST_parentOf {RelationType: "object"}]->({Type: "Identifier", Code: "%s"})
+        RETURN expr_node, arg_node_key, arg_node_val;
+                ''' % storage_type
+
+    for result in tx.run(query):
+        expr_node = result['expr_node']
+        for arg in [get_topmost_object(tx, result['arg_node_key']), get_topmost_object(tx, result['arg_node_val'])]:
+            if arg and arg._properties['Type'] == 'Identifier':
+                results.append((expr_node, arg['Code']))
+
+    return results
 
 
+def get_topmost_object(tx, node):
+    if node._properties['Type'] == 'Identifier':
+        return node
+    results = tx.run('MATCH ({Id: "%s"})-[:AST_parentOf*1..10 {RelationType: "object"}]->(top {Type: "Identifier"}) RETURN top;' % node._properties['Id'])
+    for result in results:
+        return result['top']
+    return None
 
 
 def print_report(vulnerabilities):
@@ -89,20 +118,17 @@ def print_report(vulnerabilities):
     print(f'{report_header}\n{vulnerability_str}\n{assessment_str}\n')
 
 
-
-
 def do_generic_analysis(tx, label, fn, args=()):
     vulnerabilities = []
     for expr_node, slice_criterion in fn(tx, *args):
-        #if do_reachability_analysis(tx, node_id=expr_node.id) == 'unreachable':
-        #    continue
+        if do_reachability_analysis(tx, node_id=expr_node._properties['Id']) == 'unreachable':
+            print('Warning: Unreachable node: %s' % repr(expr_node))
+            continue
         for code, args, ids, location in get_varname_value_from_context(slice_criterion, expr_node):
             match_window = re.search('window\.(.*)', code)
             if match_window is not None:
                 vulnerabilities.append((label, code, location))
     return vulnerabilities
-
-
 
 
 if __name__ == '__main__':
@@ -111,10 +137,7 @@ if __name__ == '__main__':
     with database.session() as session:
         with session.begin_transaction() as tx:
 
-
             vulnerabilities = []
-
-
 
 
             generic_queries = [
@@ -123,20 +146,20 @@ if __name__ == '__main__':
                 ('document.domain', get_obj_property_sinks, ('document', 'domain')),
                 ('window.location', get_obj_property_sinks, ('window', 'location')),
                 ('innerHTML', get_property_sinks, ('innerHTML',)),
-                ('JSON.parse', get_json_sinks)
+                ('JSON.parse', get_json_sinks),
+                ('localStorage.setItem', get_storage_sinks, ('localStorage',)),
+                ('sessionStorage.setItem', get_storage_sinks, ('sessionStorage',))
             ]
 
             for params in generic_queries:
                 vulnerabilities += do_generic_analysis(tx, *params)
 
 
-
-
             # Analysis of document.*.appendChild() sinks (!)
             
             for expr_node, arg in get_document_append_child_sinks(tx):
 
-                if do_reachability_analysis(tx, node_id=expr_node.id) == 'unreachable': 
+                if do_reachability_analysis(tx, node_id=expr_node._properties['Id']) == 'unreachable': 
                     continue
 
                 src_code = None

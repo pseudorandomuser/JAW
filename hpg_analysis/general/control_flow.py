@@ -33,7 +33,7 @@ import hpg_neo4j.query_utility as QU
 import hpg_neo4j.db_utility as DU
 
 #def do_reachability_analysis(tx, node, input_is_top=False):
-def do_reachability_analysis(tx, node=None, node_id=-1):
+def do_reachability_analysis(tx, node=None, node_id=''):
 
 	# return values
 	NORMAL_PAGE_LOAD = 'onPageLoad' # reachable at page load

@@ -1,6 +1,5 @@
 function main() {
-    var myObject = window.myObject || { html: 'Hello world!' };
-    var new_html = myObject.html;
-    hashValue.innerHTML = new_html;
+    var obj = window.myObject || { html: 'Hello world!' };
+    hashValue.innerHTML = obj.html;
 }
 main();
