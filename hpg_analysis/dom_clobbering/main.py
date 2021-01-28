@@ -19,6 +19,9 @@ from hpg_analysis.dom_clobbering.general.data_flow import get_varname_value_from
 from hpg_neo4j.db_utility import API_neo4j_prepare
 
 
+DEBUG = False
+
+
 def get_property_assignment_sinks(tx, property, obj=None):
 
     obj_slice = ''
@@ -32,7 +35,7 @@ def get_property_assignment_sinks(tx, property, obj=None):
         WHERE right_expr.Type = 'Identifier' OR right_expr.Type = 'MemberExpression'
         RETURN expr_node, right_expr;''' % (property, obj_slice)
 
-    print(query)
+    if DEBUG: print(query)
 
     return [(r['expr_node'], get_top_obj(tx, r['right_expr'])['Code']) for r in tx.run(query)]
 
@@ -65,7 +68,7 @@ def get_complex_call_sinks(tx, n_args, func, obj=None):
         RETURN expr_node%s;
     ''' % (arg_node_query_slices, callee_props, callee_locator, callee_where, arg_node_returns)
 
-    print(query)
+    if DEBUG: print(query)
 
     for result in tx.run(query):
         expr_node = result['expr_node']
@@ -122,7 +125,7 @@ def run_generic_analysis(tx, label, fn, args=()):
     return vulnerabilities
 
 
-def run_analysis(report_out=None, report_json=True):
+def run_analysis(report_out=None, report_json=True, debug=False):
 
     database = GraphDatabase.driver(constants.NEO4J_CONN_STRING, auth=(constants.NEO4J_USER, constants.NEO4J_PASS))
     with database.session() as session:
@@ -153,7 +156,6 @@ def run_analysis(report_out=None, report_json=True):
             ]
 
             jquery_sinks = [
-                (1, 'add'),
                 (2, 'add'), 
                 (1, 'append'), 
                 (1, 'after'),
@@ -174,7 +176,7 @@ def run_analysis(report_out=None, report_json=True):
             ]
 
             for n_arg, jquery_sink in jquery_sinks:
-                generic_queries.append(('$().%s()' % jquery_sink, get_complex_call_sinks, (n_arg, jquery_sink, '$')))
+                generic_sinks.append(('$().%s()' % jquery_sink, get_complex_call_sinks, (n_arg, jquery_sink, '$')))
 
             for params in generic_sinks:
                 vulnerabilities += run_generic_analysis(tx, *params)
@@ -208,11 +210,11 @@ def run_analysis(report_out=None, report_json=True):
 
 
 # FIXME: CSV generation not working
-def generate_graph(program_folder_name):
-    program_path_name = os.path.join(program_folder_name, 'js_program.js')
+def generate_graph(relative_path, full_path):
+    program_path_name = os.path.join(full_path, 'js_program.js')
     node_args = [
         'node', '--max-old-space-size=32000', constants.ANALYZER_DRIVER_PATH, 
-        '-js', program_path_name, '-o', program_folder_name
+        '-js', program_path_name, '-o', relative_path
     ]
     print(' '.join(node_args))
     node_proc = subprocess.Popen(node_args, stdout=subprocess.PIPE)
@@ -224,6 +226,8 @@ def generate_graph(program_folder_name):
 
 
 def generate_all_graphs(jaw_data):
+    # TODO: WIP
+    '''
     if not jaw_data:
         return
     for site in os.listdir(jaw_data):
@@ -232,21 +236,20 @@ def generate_all_graphs(jaw_data):
         for url in os.listdir(site_path):
             url_path = os.path.join(site_path, url)
             print(f'Generating graph data for site {site} url {url}...')
-            generate_graph(url_path)
+            generate_graph(url_path)'''
 
 
 def import_site_data(site_id=0, site_url=None, use_url_id=False, generate_only=False, overwrite=False):
 
     url_hash = site_url if use_url_id else _hash(site_url)
     relative_path = os.path.join(str(site_id), url_hash)
-
-    full_path = site_path if site_path else os.path.join(jaw_data, f'{site_id}{os.path.sep}{site_url if use_url_id else _hash(site_url)}')
+    full_path = os.path.join(os.path.join(PROJECT_ROOT, f'hpg_construction{os.path.sep}outputs'), relative_path)
     
     node_path = os.path.join(full_path, constants.NODE_INPUT_FILE_NAME)
     rels_path = os.path.join(full_path, constants.RELS_INPUT_FILE_NAME)
     if not overwrite and os.path.exists(node_path) and os.path.exists(rels_path):
         print('Graph already exists, skipping...')
-    else: generate_graph(full_path)
+    else: generate_graph(relative_path, full_path)
 
     if not generate_only:
         API_neo4j_prepare(full_path)
@@ -282,7 +285,7 @@ if __name__ == '__main__':
     args = main_parser.parse_args()
 
     if args.action == 'analyze':
-        run_analysis(report_out=args.out, report_json=args.json)
+        run_analysis(args.out, args.json)
     elif args.action == 'import':
         import_site_data(args.id, args.url, args.url_id, args.generate_only, args.overwrite)
     elif args.action == 'all':
