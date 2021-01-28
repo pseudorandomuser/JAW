@@ -1,0 +1,29 @@
+Id:ID¿ Type¿ Kind¿ Code¿ Range¿ Location¿ Value¿ Raw¿ Async¿ Label:LABEL¿ SemanticType
+27¿ exit¿ ¿ ¿ ¿ ¿ ¿ ¿ ¿ ASTNode¿ 
+28¿ exit¿ ¿ ¿ ¿ ¿ ¿ ¿ ¿ ASTNode¿ 
+1¿ Program¿ ¿ ¿ [151,261]¿ {start:{line:2,column:0},end:{line:5,column:5}}¿ ¿ ¿ ¿ ASTNode¿ 
+2¿ ExpressionStatement¿ ¿ ¿ [151,261]¿ {start:{line:2,column:0},end:{line:5,column:5}}¿ ¿ ¿ ¿ ASTNode¿ 
+3¿ CallExpression¿ ¿ ¿ [151,260]¿ {start:{line:2,column:0},end:{line:5,column:4}}¿ ¿ ¿ ¿ ASTNode¿ 
+4¿ FunctionExpression¿ ¿ ¿ [152,257]¿ {start:{line:2,column:1},end:{line:5,column:1}}¿ ¿ ¿ false¿ ASTNode¿ 
+5¿ BlockStatement¿ ¿ ¿ [163,257]¿ {start:{line:2,column:12},end:{line:5,column:1}}¿ ¿ ¿ ¿ ASTNode¿ 
+6¿ VariableDeclaration¿ let¿ ¿ [166,221]¿ {start:{line:3,column:1},end:{line:3,column:56}}¿ ¿ ¿ ¿ ASTNode¿ 
+7¿ VariableDeclarator¿ ¿ =¿ [170,220]¿ {start:{line:3,column:5},end:{line:3,column:55}}¿ ¿ ¿ ¿ ASTNode¿ 
+8¿ Identifier¿ ¿ myObject¿ [170,178]¿ {start:{line:3,column:5},end:{line:3,column:13}}¿ ¿ ¿ ¿ ASTNode¿ 
+9¿ LogicalExpression¿ ¿ ||¿ [181,220]¿ {start:{line:3,column:16},end:{line:3,column:55}}¿ ¿ ¿ ¿ ASTNode¿ 
+10¿ MemberExpression¿ ¿ ¿ [181,196]¿ {start:{line:3,column:16},end:{line:3,column:31}}¿ ¿ ¿ ¿ ASTNode¿ 
+11¿ Identifier¿ ¿ window¿ [181,187]¿ {start:{line:3,column:16},end:{line:3,column:22}}¿ ¿ ¿ ¿ ASTNode¿ 
+12¿ Identifier¿ ¿ myObject¿ [188,196]¿ {start:{line:3,column:23},end:{line:3,column:31}}¿ ¿ ¿ ¿ ASTNode¿ 
+13¿ ObjectExpression¿ ¿ ¿ [200,220]¿ {start:{line:3,column:35},end:{line:3,column:55}}¿ ¿ ¿ ¿ ASTNode¿ 
+14¿ Property¿ init¿ ¿ [202,218]¿ {start:{line:3,column:37},end:{line:3,column:53}}¿ ¿ ¿ ¿ ASTNode¿ 
+15¿ Identifier¿ ¿ arg¿ [202,205]¿ {start:{line:3,column:37},end:{line:3,column:40}}¿ ¿ ¿ ¿ ASTNode¿ 
+16¿ Literal¿ ¿ ¿ [207,218]¿ {start:{line:3,column:42},end:{line:3,column:53}}¿ some data¿ 'some data'¿ ¿ ASTNode¿ 
+17¿ ExpressionStatement¿ ¿ ¿ [223,255]¿ {start:{line:4,column:1},end:{line:4,column:33}}¿ ¿ ¿ ¿ ASTNode¿ 
+18¿ CallExpression¿ ¿ ¿ [223,254]¿ {start:{line:4,column:1},end:{line:4,column:32}}¿ ¿ ¿ ¿ ASTNode¿ 
+19¿ MemberExpression¿ ¿ ¿ [223,245]¿ {start:{line:4,column:1},end:{line:4,column:23}}¿ ¿ ¿ ¿ ASTNode¿ 
+20¿ CallExpression¿ ¿ ¿ [223,238]¿ {start:{line:4,column:1},end:{line:4,column:16}}¿ ¿ ¿ ¿ ASTNode¿ 
+21¿ Identifier¿ ¿ $¿ [223,224]¿ {start:{line:4,column:1},end:{line:4,column:2}}¿ ¿ ¿ ¿ ASTNode¿ 
+22¿ MemberExpression¿ ¿ ¿ [225,237]¿ {start:{line:4,column:3},end:{line:4,column:15}}¿ ¿ ¿ ¿ ASTNode¿ 
+23¿ Identifier¿ ¿ myObject¿ [225,233]¿ {start:{line:4,column:3},end:{line:4,column:11}}¿ ¿ ¿ ¿ ASTNode¿ 
+24¿ Identifier¿ ¿ arg¿ [234,237]¿ {start:{line:4,column:12},end:{line:4,column:15}}¿ ¿ ¿ ¿ ASTNode¿ 
+25¿ Identifier¿ ¿ append¿ [239,245]¿ {start:{line:4,column:17},end:{line:4,column:23}}¿ ¿ ¿ ¿ ASTNode¿ 
+26¿ Literal¿ ¿ ¿ [246,253]¿ {start:{line:4,column:24},end:{line:4,column:31}}¿ fodes¿ fodes¿ ¿ ASTNode¿ 
