@@ -235,10 +235,7 @@ def generate_all_graphs(jaw_data):
             generate_graph(url_path)
 
 
-def import_site_data(site_id=0, site_url=None, use_url_id=False, generate_only=False, overwrite=False):
-
-    url_hash = site_url if use_url_id else _hash(site_url)
-    relative_path = os.path.join(str(site_id), url_hash)
+def import_site_data(site_path, site_id=0, site_url=None, jaw_data=None, use_url_id=False, generate_only=False, overwrite=False):
 
     full_path = site_path if site_path else os.path.join(jaw_data, f'{site_id}{os.path.sep}{site_url if use_url_id else _hash(site_url)}')
     
@@ -262,14 +259,17 @@ if __name__ == '__main__':
     sub_parsers = main_parser.add_subparsers(dest='action', required=True)
 
     all_parser = sub_parsers.add_parser('all')
+    all_parser.add_argument('--root', metavar='path', default=jaw_data_path, help='Root path of site repository')
 
     import_parser = sub_parsers.add_parser('import')
 
     import_group = import_parser.add_mutually_exclusive_group(required=True)
+    import_group.add_argument('--path',  metavar='path', type=str, help='Absolute path to the website to import')
     import_group.add_argument('--id',  metavar='id', type=int, help='ID of the website to import')
 
     import_parser.add_argument('--url', metavar='url', type=str, help='URL of the site to import')
     import_parser.add_argument('--url_id', action='store_true', help='Use the URL ID as is without re-hashing')
+    import_parser.add_argument('--jaw_data', metavar='path', default=jaw_data_path, help='Path to JAW site data')
 
     import_ex_group = import_parser.add_mutually_exclusive_group()
     import_ex_group.add_argument('--generate_only', action='store_true', help='Only generate graph without importing')
@@ -284,8 +284,8 @@ if __name__ == '__main__':
     if args.action == 'analyze':
         run_analysis(report_out=args.out, report_json=args.json)
     elif args.action == 'import':
-        import_site_data(args.id, args.url, args.url_id, args.generate_only, args.overwrite)
+        import_site_data(args.path, args.id, args.url, args.jaw_data, args.url_id, args.generate_only, args.overwrite)
     elif args.action == 'all':
-        generate_all_graphs()
+        generate_all_graphs(args.root)
     else:
         sys.exit(-1)
