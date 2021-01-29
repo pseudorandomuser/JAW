@@ -13,13 +13,13 @@ sys.path.append(PROJECT_ROOT)
 import constants
 from utils.utility import _hash
 
-from hpg_analysis.dom_clobbering.general.control_flow import do_reachability_analysis
-from hpg_analysis.dom_clobbering.general.data_flow import get_varname_value_from_context
+from hpg_analysis.general.control_flow import do_reachability_analysis
+from hpg_analysis.general.data_flow import get_varname_value_from_context
 
 from hpg_neo4j.db_utility import API_neo4j_prepare
 
 
-DEBUG = False
+DEBUG = True
 
 
 def get_property_assignment_sinks(tx, property, obj=None):
@@ -37,7 +37,7 @@ def get_property_assignment_sinks(tx, property, obj=None):
 
     if DEBUG: print(query)
 
-    return [(r['expr_node'], get_top_obj(tx, r['right_expr'])['Code']) for r in tx.run(query)]
+    return [(r['expr_node'], r['assign_expr'], get_top_obj(tx, r['right_expr'])['Code']) for r in tx.run(query)]
 
 
 def get_complex_call_sinks(tx, n_args, func, obj=None):
@@ -65,17 +65,18 @@ def get_complex_call_sinks(tx, n_args, func, obj=None):
     query = '''MATCH (expr_node)-[:AST_parentOf*1..10]->(call_expr {Type: "CallExpression"}),%s
             (call_expr)-[:AST_parentOf {RelationType: "callee"}]->(callee_node %s)%s
         WHERE expr_node.Type = 'ExpressionStatement' OR expr_node.Type = 'VariableDeclaration'%s
-        RETURN expr_node%s;
+        RETURN expr_node, call_expr%s;
     ''' % (arg_node_query_slices, callee_props, callee_locator, callee_where, arg_node_returns)
 
     if DEBUG: print(query)
 
     for result in tx.run(query):
         expr_node = result['expr_node']
+        call_expr = result['call_expr']
         for i in range(0, n_args):
             arg = get_top_obj(tx, result['arg_node_%d' % i])
             if arg and arg['Type'] == 'Identifier':
-                results.append((expr_node, arg['Code']))
+                results.append((expr_node, call_expr, arg['Code']))
             
     return results
 
@@ -89,6 +90,16 @@ def get_top_obj(tx, node):
     return None
 
 
+def parse_location(location_str):
+    location_regex = re.match('{start:{line:([0-9]+),column:([0-9]+)},end:{line:([0-9]+),column:([0-9]+)}}', location_str)
+    start_line, start_col, end_line, end_col = location_regex.groups()
+    return {
+        'start_line': start_line, 
+        'start_col': start_col, 
+        'end_line': end_line, 
+        'end_col': end_col
+    }
+
 # TODO: Implement writing to file and JSON
 def generate_report(vulnerabilities, out=None, json=True):
 
@@ -98,10 +109,9 @@ def generate_report(vulnerabilities, out=None, json=True):
 ###################################'''
 
     vulnerability_str = ''
-    for sink, code, location in vulnerabilities:
-        location_regex = re.match('{start:{line:([0-9]+),column:([0-9]+)},end:{line:([0-9]+),column:([0-9]+)}}', location)
-        start_line, start_col, end_line, end_col = location_regex.groups()
-        vulnerability_str += f'\nLocation:\tLine {start_line} column {start_col}\nSink type:\t{sink}\nSource code:\t{code}\n'
+    for sink, code, location_str in vulnerabilities:
+        location = parse_location(location_str)
+        vulnerability_str += f"\nLocation:\tLine {location['start_line']} column {location['start_col']}\nSink type:\t{sink}\nSource code:\t{code}\n"
 
     vulnerabilities_len = len(vulnerabilities)
     assessment_str = f'Final assessment: {vulnerabilities_len} ' \
@@ -114,11 +124,17 @@ def generate_report(vulnerabilities, out=None, json=True):
 # TODO: Improve return format for JSON output
 def run_generic_analysis(tx, label, fn, args=()):
     vulnerabilities = []
-    for expr_node, slice_criterion in fn(tx, *args):
+    for expr_node, stmt_node, slice_criterion in fn(tx, *args):
+        if DEBUG:
+            print(expr_node)
+            print(stmt_node)
+            print(slice_criterion)
         if do_reachability_analysis(tx, node=expr_node) == 'unreachable':
             print('Warning: Unreachable node: %s' % repr(expr_node))
             continue
-        for code, args, ids, location in get_varname_value_from_context(slice_criterion, expr_node):
+        slice = get_varname_value_from_context(slice_criterion, expr_node)
+        print(slice)
+        for code, args, ids, location in slice:
             match_window = re.search('window\.(.*)', code)
             if match_window is not None:
                 vulnerabilities.append((label, code, location))
@@ -183,7 +199,7 @@ def run_analysis(report_out=None, report_json=True, debug=False):
 
             # Analysis of document.*.appendChild() sinks (!)
             
-            for expr_node, arg in get_complex_call_sinks(tx, 1, 'appendChild', 'document'):
+            for expr_node, stmt_node, arg in get_complex_call_sinks(tx, 1, 'appendChild', 'document'):
 
                 if do_reachability_analysis(tx, node=expr_node) == 'unreachable': 
                     print('Warning: Unreachable node: %s' % repr(expr_node))
