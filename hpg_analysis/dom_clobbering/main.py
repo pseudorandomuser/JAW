@@ -1,7 +1,6 @@
 import re
 import os
 import sys
-import ast
 import json
 import argparse
 import subprocess
@@ -12,21 +11,45 @@ PROJECT_ROOT = os.path.join(os.path.dirname(sys.argv[0]), f'..{os.path.sep}..')
 sys.path.append(PROJECT_ROOT)
 
 import constants
+
 from utils.utility import _hash
 
 from hpg_analysis.general.control_flow import do_reachability_analysis
 from hpg_analysis.general.data_flow import get_varname_value_from_context
 
-from hpg_analysis.dom_clobbering.const import WINDOW_PREDEFINED_PROPERTIES
-
 from hpg_neo4j.db_utility import API_neo4j_prepare
 from hpg_neo4j.query_utility import getChildsOf, get_code_expression
+
+from hpg_analysis.dom_clobbering.const import WINDOW_PREDEFINED_PROPERTIES
 
 
 DEBUG = False
 
 CLOBBERING_REGEX = re.compile('window\.(?!(%s)(;|\s)).*' % '|'.join(WINDOW_PREDEFINED_PROPERTIES))
 SCRIPT_REGEX = re.compile('document\.createElement\([\'|"](script)[\'|"]\)')
+
+
+class Report:
+
+    report_sinks = [ sys.stdout ]
+
+    def __init__(self, file_path=None, json=True):
+        if file_path:
+            self.report_sinks.append(open(file_path, 'w'))
+        self.json = json
+
+    def is_json(self):
+        return self.json
+
+    def write(self, text):
+        for report_sink in self.report_sinks:
+            report_sink.write(text)
+            report_sink.flush()
+
+    def close(self):
+        for report_sink in self.report_sinks:
+            if report_sink is not sys.stdout:
+                report_sink.close()
 
 
 def get_property_assignment_sinks(tx, property, obj=None):
@@ -108,19 +131,11 @@ def parse_location(location_str):
     }
 
 
-def report_out(file_handle, text):
-    if file_handle:
-        file_handle.write(text)
-        file_handle.flush()
-    print(text)
+def generate_report(vulnerabilities, report):
 
-def generate_report(vulnerabilities, out_path=None, report_json=True):
-
-    file_handle = None if not out_path else open(out_path, 'w')
-
-    if report_json:
+    if report.is_json():
         json_repr = json.dumps(vulnerabilities, indent = 4)
-        report_out(file_handle, json_repr)
+        report.write(json_repr)
 
     else:
         vulnerability_count = 1
@@ -135,25 +150,21 @@ def generate_report(vulnerabilities, out_path=None, report_json=True):
 [*] Location: {loc_str}
 [*] Function: {vulnerability['function']}
 [*] Template: {vulnerability['template']}
-[*] Top Expression: {vulnerability['top_expression']}
-'''
+[*] Top Expression: {vulnerability['top_expression']}\n\n'''
 
-            report_out(file_handle, report_readable)
-            report_out(file_handle, f"{vulnerability_count}:{repr(vulnerability['tags'])} variable = {vulnerability['variable']}")
-            report_out(file_handle, f"\t(loc:{loc_str}) {vulnerability['top_expression']}")
+            report.write(report_readable)
+            report.write(f"{vulnerability_count}:{repr(vulnerability['tags'])} variable = {vulnerability['variable']}\n")
+            report.write(f"\t(loc:{loc_str}) {vulnerability['top_expression']}\n")
 
             for slice in vulnerability['slices']:
                 loc = slice['location']
                 loc_str = f"{loc['start_line']}:{loc['start_col']}"
-                report_out(file_handle, f"\t(loc:{loc_str}) {slice['code']}")
+                report.write(f"\t(loc:{loc_str}) {slice['code']}\n")
 
             vulnerability_count += 1
     
-    report_out(file_handle, '')
-
-    if file_handle:
-        file_handle.flush()
-        file_handle.close()
+    report.write('\n')
+    report.close()
 
 
 def analyze_sink_type(tx, label, fn, args=()):
@@ -196,14 +207,13 @@ def analyze_sink_type(tx, label, fn, args=()):
     return vulnerabilities
 
 
-def run_analysis(report_out=None, report_json=True, debug=False):
+def run_analysis(report):
 
     database = GraphDatabase.driver(constants.NEO4J_CONN_STRING, auth=(constants.NEO4J_USER, constants.NEO4J_PASS))
     with database.session() as session:
         with session.begin_transaction() as tx:
 
             vulnerabilities = []
-
 
             sink_types = [
                 
@@ -244,7 +254,7 @@ def run_analysis(report_out=None, report_json=True, debug=False):
             for params in sink_types:
                 vulnerabilities += analyze_sink_type(tx, *params)
 
-            generate_report(vulnerabilities, report_out, report_json)
+            generate_report(vulnerabilities, report)
 
 
 # FIXME: CSV generation not working
@@ -307,7 +317,9 @@ if __name__ == '__main__':
     args = main_parser.parse_args()
 
     if args.action == 'analyze':
-        run_analysis(args.out, args.json)
+        report = Report(args.out, args.json)
+        run_analysis(report)
+        report.close()
     elif args.action == 'import':
         import_site_data(args.id, args.url, args.url_id, args.generate_only, args.overwrite)
     else:
