@@ -38,3 +38,4 @@ FromId:START_ID¿ ToId:END_ID¿ RelationLabel:TYPE¿ RelationType¿ Arguments
 30¿ 28¿ "CFG_parentOf"¿ "Epsilon"¿ "exit"
 11¿ 22¿ "PDG_parentOf"¿ "DataFlow"¿ "myObject"
 5¿ 6¿ "PDG_parentOf"¿ "DataFlow"¿ "code"
+"23"¿ "2"¿ "CG_parentOf"¿ "CallFlow"¿ {"0":"myObject.code"}

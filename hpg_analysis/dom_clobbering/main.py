@@ -2,6 +2,7 @@ import re
 import os
 import sys
 import ast
+import json
 import argparse
 import subprocess
 
@@ -16,10 +17,16 @@ from utils.utility import _hash
 from hpg_analysis.general.control_flow import do_reachability_analysis
 from hpg_analysis.general.data_flow import get_varname_value_from_context
 
+from hpg_analysis.dom_clobbering.const import WINDOW_PREDEFINED_PROPERTIES
+
 from hpg_neo4j.db_utility import API_neo4j_prepare
+from hpg_neo4j.query_utility import getChildsOf, get_code_expression
 
 
-DEBUG = True
+DEBUG = False
+
+CLOBBERING_REGEX = re.compile('window\.(?!(%s)(;|\s)).*' % '|'.join(WINDOW_PREDEFINED_PROPERTIES))
+SCRIPT_REGEX = re.compile('document\.createElement\([\'|"](script)[\'|"]\)')
 
 
 def get_property_assignment_sinks(tx, property, obj=None):
@@ -33,11 +40,11 @@ def get_property_assignment_sinks(tx, property, obj=None):
                 (assign_expr)-[:AST_parentOf {RelationType: "left"}]->(left_expr {Type: "MemberExpression"}),
                 (left_expr)-[:AST_parentOf {RelationType: "property"}]->(property_node {Type: "Identifier", Code: "%s"})%s
         WHERE right_expr.Type = 'Identifier' OR right_expr.Type = 'MemberExpression'
-        RETURN expr_node, right_expr;''' % (property, obj_slice)
+        RETURN expr_node, assign_expr, right_expr;''' % (property, obj_slice)
 
     if DEBUG: print(query)
 
-    return [(r['expr_node'], r['assign_expr'], get_top_obj(tx, r['right_expr'])['Code']) for r in tx.run(query)]
+    return [(r['expr_node'], r['assign_expr'], get_top_obj(tx, r['right_expr'])) for r in tx.run(query)]
 
 
 def get_complex_call_sinks(tx, n_args, func, obj=None):
@@ -76,7 +83,7 @@ def get_complex_call_sinks(tx, n_args, func, obj=None):
         for i in range(0, n_args):
             arg = get_top_obj(tx, result['arg_node_%d' % i])
             if arg and arg['Type'] == 'Identifier':
-                results.append((expr_node, call_expr, arg['Code']))
+                results.append((expr_node, call_expr, arg))
             
     return results
 
@@ -100,44 +107,92 @@ def parse_location(location_str):
         'end_col': end_col
     }
 
-# TODO: Implement writing to file and JSON
-def generate_report(vulnerabilities, out=None, json=True):
 
-    report_header = '''
-###################################
-# DOM Clobbering Analysis Results #
-###################################'''
+def report_out(file_handle, text):
+    if file_handle:
+        file_handle.write(text)
+        file_handle.flush()
+    print(text)
 
-    vulnerability_str = ''
-    for sink, code, location_str in vulnerabilities:
-        location = parse_location(location_str)
-        vulnerability_str += f"\nLocation:\tLine {location['start_line']} column {location['start_col']}\nSink type:\t{sink}\nSource code:\t{code}\n"
+def generate_report(vulnerabilities, out_path=None, report_json=True):
 
-    vulnerabilities_len = len(vulnerabilities)
-    assessment_str = f'Final assessment: {vulnerabilities_len} ' \
-        + f'Vulnerabilit{"ies were" if vulnerabilities_len > 1 else "y was"} found.\n' \
-        + f'{"A" if vulnerabilities_len > 0 else "No a"}ction needs to be taken.'
+    file_handle = None if not out_path else open(out_path, 'w')
 
-    print(f'{report_header}\n{vulnerability_str}\n{assessment_str}\n')
+    if report_json:
+        json_repr = json.dumps(vulnerabilities, indent = 4)
+        report_out(file_handle, json_repr)
+
+    else:
+        vulnerability_count = 1
+        for vulnerability in vulnerabilities:
+
+            loc = vulnerability['location']
+            loc_str = f"{loc['start_line']}:{loc['start_col']}"
+
+            report_readable = f'''
+[*] Tags: {repr(vulnerability['tags'])}
+[*] NodeId: {repr(vulnerability['node_id'])}
+[*] Location: {loc_str}
+[*] Function: {vulnerability['function']}
+[*] Template: {vulnerability['template']}
+[*] Top Expression: {vulnerability['top_expression']}
+'''
+
+            report_out(file_handle, report_readable)
+            report_out(file_handle, f"{vulnerability_count}:{repr(vulnerability['tags'])} variable = {vulnerability['variable']}")
+            report_out(file_handle, f"\t(loc:{loc_str}) {vulnerability['top_expression']}")
+
+            for slice in vulnerability['slices']:
+                loc = slice['location']
+                loc_str = f"{loc['start_line']}:{loc['start_col']}"
+                report_out(file_handle, f"\t(loc:{loc_str}) {slice['code']}")
+
+            vulnerability_count += 1
+    
+    report_out(file_handle, '')
+
+    if file_handle:
+        file_handle.flush()
+        file_handle.close()
 
 
-# TODO: Improve return format for JSON output
-def run_generic_analysis(tx, label, fn, args=()):
+def analyze_sink_type(tx, label, fn, args=()):
+
     vulnerabilities = []
-    for expr_node, stmt_node, slice_criterion in fn(tx, *args):
-        if DEBUG:
-            print(expr_node)
-            print(stmt_node)
-            print(slice_criterion)
+
+    for expr_node, stmt_node, arg_node in fn(tx, *args):
+        
         if do_reachability_analysis(tx, node=expr_node) == 'unreachable':
-            print('Warning: Unreachable node: %s' % repr(expr_node))
-            continue
-        slice = get_varname_value_from_context(slice_criterion, expr_node)
-        print(slice)
-        for code, args, ids, location in slice:
-            match_window = re.search('window\.(.*)', code)
-            if match_window is not None:
-                vulnerabilities.append((label, code, location))
+            label = 'NON-REACH'
+
+        slices = get_varname_value_from_context(arg_node['Code'], expr_node)
+        slices_format = [{'code': code, 'location': parse_location(location)} for code, _, _, location in slices]
+        
+        window_match = False if label != 'getElementById()' else True
+        script_match = False if label == 'document.appendChild()' else True
+
+        for code, args, ids, location in slices:
+
+            window_match = True if window_match else CLOBBERING_REGEX.search(code)
+            script_match = True if script_match else SCRIPT_REGEX.search(code)
+
+            if window_match and script_match:
+
+                vulnerabilities.append({
+                    'tags': [label.upper()],
+                    'node_id': {
+                        'top_expression': expr_node['Id'],
+                        'sink_expression': stmt_node['Id'],
+                        'argument': arg_node['Id']
+                    },
+                    'function': label,
+                    'template': None,
+                    'location': parse_location(expr_node['Location']),
+                    'top_expression': get_code_expression(getChildsOf(tx, expr_node))[0],
+                    'variable': arg_node['Code'],
+                    'slices': slices_format
+                })
+
     return vulnerabilities
 
 
@@ -149,11 +204,14 @@ def run_analysis(report_out=None, report_json=True, debug=False):
 
             vulnerabilities = []
 
-            generic_sinks = [
+
+            sink_types = [
                 
                 ('eval()', get_complex_call_sinks, (1, 'eval')),
                 ('document.write()', get_complex_call_sinks, (1, 'write', 'document')),
                 ('document.writeln()', get_complex_call_sinks, (1, 'writeln', 'document')),
+                ('document.appendChild()', get_complex_call_sinks, (1, 'appendChild', 'document')),
+                ('getElementById()', get_complex_call_sinks, (1, 'getElementById')),
                 ('JSON.parse()', get_complex_call_sinks, (1, 'parse', 'JSON')),
                 ('localStorage.setItem', get_complex_call_sinks, (2, 'setItem', 'localStorage')),
                 ('sessionStorage.setItem', get_complex_call_sinks, (2, 'setItem', 'sessionStorage')),
@@ -172,57 +230,21 @@ def run_analysis(report_out=None, report_json=True, debug=False):
             ]
 
             jquery_sinks = [
-                (2, 'add'), 
-                (1, 'append'), 
-                (1, 'after'),
-                (2, 'animate'), 
-                (1, 'insertAfter'), 
-                (1, 'insertBefore'), 
-                (1, 'before'), 
-                (1, 'html'), 
-                (1, 'prepend'), 
-                (1, 'replaceAll'), 
-                (1, 'replaceWith'), 
-                (1, 'wrap'), 
-                (1, 'wrapInner'), 
-                (1, 'wrapAll'), 
-                (1, 'has'),
-                (1, 'index'), 
-                (1, 'parseHTML')
+                (2, 'add'), (1, 'append'), (1, 'after'),
+                (2, 'animate'), (1, 'insertAfter'), (1, 'insertBefore'), 
+                (1, 'before'), (1, 'html'), (1, 'prepend'), 
+                (1, 'replaceAll'), (1, 'replaceWith'), (1, 'wrap'), 
+                (1, 'wrapInner'), (1, 'wrapAll'), (1, 'has'),
+                (1, 'index'), (1, 'parseHTML')
             ]
 
             for n_arg, jquery_sink in jquery_sinks:
-                generic_sinks.append(('$().%s()' % jquery_sink, get_complex_call_sinks, (n_arg, jquery_sink, '$')))
+                sink_types.append(('$().%s()' % jquery_sink, get_complex_call_sinks, (n_arg, jquery_sink, '$')))
 
-            for params in generic_sinks:
-                vulnerabilities += run_generic_analysis(tx, *params)
+            for params in sink_types:
+                vulnerabilities += analyze_sink_type(tx, *params)
 
-            # Analysis of document.*.appendChild() sinks (!)
-            
-            for expr_node, stmt_node, arg in get_complex_call_sinks(tx, 1, 'appendChild', 'document'):
-
-                if do_reachability_analysis(tx, node=expr_node) == 'unreachable': 
-                    print('Warning: Unreachable node: %s' % repr(expr_node))
-                    continue
-
-                src_code = None
-                src_location = None
-                script_created = False
-
-                for code, args, ids, location in get_varname_value_from_context(arg, expr_node):
-                    match_create = re.search('document\.createElement\([\'|"]([A-Za-z]*)[\'|"]\)', code)
-                    match_window = re.search('window\.(.*)', code)
-                    if match_create is not None:
-                        groups = match_create.groups()
-                        script_created = groups[0] == 'script'
-                    if match_window is not None:
-                        src_code, src_location = code, location
-
-                if script_created and src_code and src_location:
-                    vulnerabilities.append(('document.appendChild()', src_code, src_location))
-
-
-            generate_report(vulnerabilities, out=report_out, json=report_json)
+            generate_report(vulnerabilities, report_out, report_json)
 
 
 # FIXME: CSV generation not working
@@ -239,20 +261,6 @@ def generate_graph(relative_path, full_path):
             print(line.decode('UTF-8'))
     node_proc.wait()
     return node_proc.returncode
-
-
-def generate_all_graphs(jaw_data):
-    # TODO: WIP
-    '''
-    if not jaw_data:
-        return
-    for site in os.listdir(jaw_data):
-        site_path = os.path.join(jaw_data, site)
-        print(f'Enumerating URLs for site {site}...')
-        for url in os.listdir(site_path):
-            url_path = os.path.join(site_path, url)
-            print(f'Generating graph data for site {site} url {url}...')
-            generate_graph(url_path)'''
 
 
 def import_site_data(site_id=0, site_url=None, use_url_id=False, generate_only=False, overwrite=False):
@@ -280,8 +288,6 @@ if __name__ == '__main__':
     main_parser = argparse.ArgumentParser(description='Large Scale Analysis of DOM Clobbering Vulnerabilities')
     sub_parsers = main_parser.add_subparsers(dest='action', required=True)
 
-    all_parser = sub_parsers.add_parser('all')
-
     import_parser = sub_parsers.add_parser('import')
 
     import_group = import_parser.add_mutually_exclusive_group(required=True)
@@ -304,7 +310,5 @@ if __name__ == '__main__':
         run_analysis(args.out, args.json)
     elif args.action == 'import':
         import_site_data(args.id, args.url, args.url_id, args.generate_only, args.overwrite)
-    elif args.action == 'all':
-        generate_all_graphs()
     else:
         sys.exit(-1)

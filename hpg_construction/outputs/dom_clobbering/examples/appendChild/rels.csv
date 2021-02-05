@@ -53,3 +53,4 @@ FromId:START_ID¿ ToId:END_ID¿ RelationLabel:TYPE¿ RelationType¿ Arguments
 8¿ 36¿ "PDG_parentOf"¿ "DataFlow"¿ "script"
 20¿ 36¿ "PDG_parentOf"¿ "DataFlow"¿ "script"
 28¿ 36¿ "PDG_parentOf"¿ "DataFlow"¿ "script"
+"2"¿ "7"¿ "ERDDG_Registration"¿ "load"¿ """register_listener_on___window___5"""
