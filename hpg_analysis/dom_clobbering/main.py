@@ -164,7 +164,6 @@ def generate_report(vulnerabilities, report):
             vulnerability_count += 1
     
     report.write('\n')
-    report.close()
 
 
 def analyze_sink_type(tx, label, fn, args=()):
@@ -257,7 +256,6 @@ def run_analysis(report):
             generate_report(vulnerabilities, report)
 
 
-# FIXME: CSV generation not working
 def generate_graph(relative_path, full_path):
     program_path_name = os.path.join(full_path, 'js_program.js')
     node_args = [
