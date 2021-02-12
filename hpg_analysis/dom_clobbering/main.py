@@ -23,7 +23,7 @@ from hpg_neo4j.query_utility import getChildsOf, get_code_expression
 from hpg_analysis.dom_clobbering.const import WINDOW_PREDEFINED_PROPERTIES
 
 
-DEBUG = False
+DEBUG = True
 
 CLOBBERING_REGEX = re.compile('window\.(?!(%s)(;|\s)).*' % '|'.join(WINDOW_PREDEFINED_PROPERTIES))
 SCRIPT_REGEX = re.compile('document\.createElement\([\'|"](script)[\'|"]\)')
@@ -67,7 +67,11 @@ def get_property_assignment_sinks(tx, property, obj=None):
 
     if DEBUG: print(query)
 
-    return [(r['expr_node'], r['assign_expr'], get_top_obj(tx, r['right_expr'])) for r in tx.run(query)]
+    db_result = tx.run(query)
+
+    if DEBUG: print('OK')
+
+    return [(r['expr_node'], r['assign_expr'], get_top_obj(tx, r['right_expr'])) for r in db_result]
 
 
 def get_complex_call_sinks(tx, n_args, func, obj=None):
@@ -100,7 +104,11 @@ def get_complex_call_sinks(tx, n_args, func, obj=None):
 
     if DEBUG: print(query)
 
-    for result in tx.run(query):
+    db_result = tx.run(query)
+
+    if DEBUG: print('OK')
+
+    for result in db_result:
         expr_node = result['expr_node']
         call_expr = result['call_expr']
         for i in range(0, n_args):
@@ -114,7 +122,9 @@ def get_complex_call_sinks(tx, n_args, func, obj=None):
 def get_top_obj(tx, node):
     if node['Type'] == 'Identifier':
         return node
-    results = tx.run('MATCH ({Id: "%s"})-[:AST_parentOf*1..10 {RelationType: "object"}]->(top {Type: "Identifier"}) RETURN top;' % node['Id'])
+    query = 'MATCH ({Id: "%s"})-[:AST_parentOf*1..10 {RelationType: "object"}]->(top {Type: "Identifier"}) RETURN top;' % node['Id']
+    if DEBUG: print(query)
+    results = tx.run(query)
     for result in results:
         return result['top']
     return None
@@ -134,8 +144,7 @@ def parse_location(location_str):
 def generate_report(vulnerabilities, report):
 
     if report.is_json():
-        json_repr = json.dumps(vulnerabilities, indent = 4)
-        report.write(json_repr)
+        report.write(json.dumps(vulnerabilities, indent = 4))
 
     else:
         vulnerability_count = 1
@@ -143,12 +152,17 @@ def generate_report(vulnerabilities, report):
 
             loc = vulnerability['location']
             loc_str = f"{loc['start_line']}:{loc['start_col']}"
-
+            
+            # tag is actually source
             report_readable = f'''
-[*] Tags: {repr(vulnerability['tags'])}
+([*] Tags: {repr(vulnerability['tags'])})
+
+Source type
+Sink type (not that important)
+
 [*] NodeId: {repr(vulnerability['node_id'])}
 [*] Location: {loc_str}
-[*] Function: {vulnerability['function']}
+[*] Sink function: {vulnerability['function']}
 [*] Template: {vulnerability['template']}
 [*] Top Expression: {vulnerability['top_expression']}\n\n'''
 
@@ -171,11 +185,18 @@ def analyze_sink_type(tx, label, fn, args=()):
     vulnerabilities = []
 
     for expr_node, stmt_node, arg_node in fn(tx, *args):
-        
+
+        if DEBUG:
+            print(expr_node)
+            print(stmt_node)
+            print(arg_node)
+
         if do_reachability_analysis(tx, node=expr_node) == 'unreachable':
             label = 'NON-REACH'
 
+        print('Find slices')
         slices = get_varname_value_from_context(arg_node['Code'], expr_node)
+        print('Found slices')
         slices_format = [{'code': code, 'location': parse_location(location)} for code, _, _, location in slices]
         
         window_match = False if label != 'getElementById()' else True
