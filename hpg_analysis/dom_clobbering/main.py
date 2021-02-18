@@ -224,19 +224,18 @@ def analyze_sink_type(tx, label, fn, args=()):
 
     vulnerabilities = []
 
-    for expr_node, stmt_node, arg_node, arg_top_node in fn(tx, *args):
+    for expr_node, stmt_node, arg_top_node, arg_id_node in fn(tx, *args):
 
-        LOGGER.debug(expr_node)
-        LOGGER.debug(stmt_node)
-        LOGGER.debug(arg_node)
-        LOGGER.debug(arg_top_node)
+        LOGGER.debug('\n%s' * 4, repr(expr_node), repr(stmt_node), repr(arg_top_node), repr(arg_id_node))
 
         if do_reachability_analysis(tx, node=expr_node) == 'unreachable':
             label = 'NON-REACH'
 
-        LOGGER.debug(arg_top_node)
-        slices = get_varname_value_from_context(arg_top_node['Code'], expr_node)
-        slices_format = [{'code': code, 'location': parse_location(location)} for code, _, _, location in slices]
+        slices = get_varname_value_from_context(arg_id_node['Code'], expr_node)
+        slices_format = [{
+            'code': code, 
+            'location': parse_location(location)
+        } for code, _, _, location in slices]
 
         source = None
         script_match = False if label == 'document.appendChild()' else True
@@ -248,7 +247,7 @@ def analyze_sink_type(tx, label, fn, args=()):
                 if result and result['prop_node']['Code'] not in WINDOW_PREDEFINED_PROPERTIES:
                     source = result
 
-            script_match = True if script_match else SCRIPT_REGEX.search(code)
+            script_match = script_match if script_match else SCRIPT_REGEX.search(code)
 
             if source and script_match:
 
@@ -261,7 +260,7 @@ def analyze_sink_type(tx, label, fn, args=()):
                         'sink_expression': stmt_node['Id'],
                         'argument': arg_top_node['Id']
                     },
-                    'template': node_str(tx, arg_node),
+                    'template': node_str(tx, arg_top_node),
                     'location': parse_location(expr_node['Location']),
                     'top_expression': node_str(tx, expr_node),
                     'variable': source['id_node']['Code'],
@@ -275,26 +274,31 @@ def analyze_sink_type(tx, label, fn, args=()):
 
 def run_analysis(report):
 
-    database = GraphDatabase.driver(constants.NEO4J_CONN_STRING, auth=(constants.NEO4J_USER, constants.NEO4J_PASS))
+    database = GraphDatabase.driver(
+        constants.NEO4J_CONN_STRING, 
+        auth=(
+            constants.NEO4J_USER, 
+            constants.NEO4J_PASS
+        )
+    )
+
     with database.session() as session:
         with session.begin_transaction() as tx:
 
             vulnerabilities = []
 
             sink_types = [
-                
                 ('eval()', get_complex_call_sinks, (1, 'eval')),
                 ('document.write()', get_complex_call_sinks, (1, 'write', 'document')),
                 ('document.writeln()', get_complex_call_sinks, (1, 'writeln', 'document')),
                 ('document.appendChild()', get_complex_call_sinks, (1, 'appendChild', 'document')),
-                ('getElementById()', get_complex_call_sinks, (1, 'getElementById')),
+                #('getElementById()', get_complex_call_sinks, (1, 'getElementById')),
                 ('JSON.parse()', get_complex_call_sinks, (1, 'parse', 'JSON')),
                 ('localStorage.setItem', get_complex_call_sinks, (2, 'setItem', 'localStorage')),
                 ('sessionStorage.setItem', get_complex_call_sinks, (2, 'setItem', 'sessionStorage')),
                 ('jQuery.parseHTML()', get_complex_call_sinks, (1, 'parseHTML', 'jQuery')),
                 ('$()', get_complex_call_sinks, (1, '$')),
                 ('jQuery()', get_complex_call_sinks, (1, 'jQuery')),
-
                 ('document.cookie', get_property_assignment_sinks, ('cookie', 'document')),
                 ('document.domain', get_property_assignment_sinks, ('domain', 'document')),
                 ('window.location', get_property_assignment_sinks, ('location', 'window')),
@@ -302,7 +306,6 @@ def run_analysis(report):
                 ('outerHTML', get_property_assignment_sinks, ('outerHTML',)),
                 ('insertAdjacentHTML', get_property_assignment_sinks, ('insertAdjacentHTML',)),
                 ('onevent', get_property_assignment_sinks, ('onevent',))
-
             ]
 
             jquery_sinks = [
