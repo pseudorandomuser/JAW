@@ -25,7 +25,7 @@ from hpg_analysis.dom_clobbering.const import WINDOW_PREDEFINED_PROPERTIES
 
 DEBUG = True
 
-CLOBBERING_REGEX = re.compile('window\.(?!(%s)(;|\s)).*' % '|'.join(WINDOW_PREDEFINED_PROPERTIES))
+CLOBBERING_REGEX = re.compile('window\.(?!(%s)(;|\s|$)).*' % '|'.join(WINDOW_PREDEFINED_PROPERTIES))
 SCRIPT_REGEX = re.compile('document\.createElement\([\'|"](script)[\'|"]\)')
 
 
@@ -71,7 +71,7 @@ def get_property_assignment_sinks(tx, property, obj=None):
 
     if DEBUG: print('OK')
 
-    return [(r['expr_node'], r['assign_expr'], get_top_obj(tx, r['right_expr'])) for r in db_result]
+    return [(r['expr_node'], r['assign_expr'], r['right_expr'], get_top_obj(tx, r['right_expr'])) for r in db_result]
 
 
 def get_complex_call_sinks(tx, n_args, func, obj=None):
@@ -112,9 +112,10 @@ def get_complex_call_sinks(tx, n_args, func, obj=None):
         expr_node = result['expr_node']
         call_expr = result['call_expr']
         for i in range(0, n_args):
-            arg = get_top_obj(tx, result['arg_node_%d' % i])
+            arg_node = result['arg_node_%d' % i]
+            arg = get_top_obj(tx, arg_node)
             if arg and arg['Type'] == 'Identifier':
-                results.append((expr_node, call_expr, arg))
+                results.append((expr_node, call_expr, arg_node, arg))
             
     return results
 
@@ -184,18 +185,19 @@ def analyze_sink_type(tx, label, fn, args=()):
 
     vulnerabilities = []
 
-    for expr_node, stmt_node, arg_node in fn(tx, *args):
+    for expr_node, stmt_node, arg_node, arg_top_node in fn(tx, *args):
 
         if DEBUG:
             print(expr_node)
             print(stmt_node)
             print(arg_node)
+            print(arg_top_node)
 
         if do_reachability_analysis(tx, node=expr_node) == 'unreachable':
             label = 'NON-REACH'
 
         print('Find slices')
-        slices = get_varname_value_from_context(arg_node['Code'], expr_node)
+        slices = get_varname_value_from_context(arg_top_node['Code'], expr_node)
         print('Found slices')
         slices_format = [{'code': code, 'location': parse_location(location)} for code, _, _, location in slices]
         
@@ -214,13 +216,13 @@ def analyze_sink_type(tx, label, fn, args=()):
                     'node_id': {
                         'top_expression': expr_node['Id'],
                         'sink_expression': stmt_node['Id'],
-                        'argument': arg_node['Id']
+                        'argument': arg_top_node['Id']
                     },
                     'function': label,
-                    'template': None,
+                    'template': get_code_expression(getChildsOf(tx, arg_node))[0],
                     'location': parse_location(expr_node['Location']),
                     'top_expression': get_code_expression(getChildsOf(tx, expr_node))[0],
-                    'variable': arg_node['Code'],
+                    'variable': arg_top_node['Code'],
                     'slices': slices_format
                 })
 
