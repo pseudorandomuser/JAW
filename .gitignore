@@ -93,9 +93,10 @@ typings/
 analyzer/outputs/out-*/*
 analyzer/outputs/test/*
 #analyzer/outputs/*
+
 hpg_construction/outputs/*
 !hpg_construction/outputs/libraries
-!hpg_construction/outputs/dom_clobbering/examples
+!hpg_construction/outputs/dom_clobbering
 
 # Neo4j import log
 import.report
