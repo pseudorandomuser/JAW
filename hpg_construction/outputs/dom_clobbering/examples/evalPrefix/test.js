@@ -1,5 +1,6 @@
 function f(code) {
-	eval("stringPrefix" + code);
+	let obj2 = window.fodes || { x: '' };
+	eval("stringPrefix" + code + obj2.x + "suffix");
 };
 
 let myObject = window.myObject || { code: '' };

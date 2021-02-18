@@ -25,7 +25,6 @@ from hpg_analysis.dom_clobbering.const import WINDOW_PREDEFINED_PROPERTIES
 
 DEBUG = True
 
-CLOBBERING_REGEX = re.compile('window\.(?!(%s)(;|\s|$)).*' % '|'.join(WINDOW_PREDEFINED_PROPERTIES))
 SCRIPT_REGEX = re.compile('document\.createElement\([\'|"](script)[\'|"]\)')
 
 
@@ -54,6 +53,8 @@ class Report:
 
 def get_property_assignment_sinks(tx, property, obj=None):
 
+    results = []
+
     obj_slice = ''
     if obj is not None:
         obj_slice = ',\n(left_expr)-[:AST_parentOf*1..5 {RelationType: "object"}]->(object_node {Type: "Identifier", Code: "%s"})' % obj
@@ -62,8 +63,10 @@ def get_property_assignment_sinks(tx, property, obj=None):
                 (assign_expr)-[:AST_parentOf {RelationType: "right"}]->(right_expr),
                 (assign_expr)-[:AST_parentOf {RelationType: "left"}]->(left_expr {Type: "MemberExpression"}),
                 (left_expr)-[:AST_parentOf {RelationType: "property"}]->(property_node {Type: "Identifier", Code: "%s"})%s
-        WHERE right_expr.Type = 'Identifier' OR right_expr.Type = 'MemberExpression'
         RETURN expr_node, assign_expr, right_expr;''' % (property, obj_slice)
+
+    '''
+        WHERE right_expr.Type = 'Identifier' OR right_expr.Type = 'MemberExpression'''
 
     if DEBUG: print(query)
 
@@ -71,7 +74,11 @@ def get_property_assignment_sinks(tx, property, obj=None):
 
     if DEBUG: print('OK')
 
-    return [(r['expr_node'], r['assign_expr'], r['right_expr'], get_top_obj(tx, r['right_expr'])) for r in db_result]
+    for r in db_result:
+        for arg_id_node in get_id_nodes(tx, r['right_expr']):
+            results.append((r['expr_node'], r['assign_expr'], r['right_expr'], arg_id_node))
+    
+    return results
 
 
 def get_complex_call_sinks(tx, n_args, func, obj=None):
@@ -113,10 +120,13 @@ def get_complex_call_sinks(tx, n_args, func, obj=None):
         call_expr = result['call_expr']
         for i in range(0, n_args):
             arg_node = result['arg_node_%d' % i]
-            arg = get_top_obj(tx, arg_node)
+            for arg_id_node in get_id_nodes(tx, arg_node):
+                results.append((expr_node, call_expr, arg_node, arg_id_node))
+            '''arg = get_top_obj(tx, arg_node)
             if arg and arg['Type'] == 'Identifier':
                 results.append((expr_node, call_expr, arg_node, arg))
-            
+            else:
+                if DEBUG: print('NOT ARG!')   '''         
     return results
 
 
@@ -131,6 +141,29 @@ def get_top_obj(tx, node):
     return None
 
 
+def get_id_nodes(tx, node):
+    if node['Type'] == 'Identifier':
+        return [node]
+    query = '''MATCH ({Id: "%s"})-[rels:AST_parentOf*1..10]->(id_node {Type: "Identifier"})
+        WHERE ALL (rel IN rels WHERE rel.RelationType = "object" OR rel.RelationType = "left" OR rel.RelationType = "right")
+        RETURN id_node;
+    ''' % node['Id']
+    if DEBUG: print(query)
+    return [r['id_node'] for r in tx.run(query)]
+
+
+def get_vulnerable_source(tx, id):
+    query = '''MATCH (decl_node {Type: "VariableDeclarator"})-[:AST_parentOf {RelationType: "id"}]->(id_node {Type: "Identifier"}), 
+            (decl_node)-[:AST_parentOf*1..10]->(member_node {Type: "MemberExpression"})
+                -[:AST_parentOf*1..10 {RelationType: "object"}]->(wnd_node {Id: "%s"}),
+            (member_node)-[:AST_parentOf {RelationType: "property"}]->(prop_node) 
+            RETURN decl_node, id_node, member_node, prop_node;
+    ''' % id
+    for result in tx.run(query):
+        return result
+    return None
+
+
 def parse_location(location_str):
     location_regex = re.match('{start:{line:([0-9]+),column:([0-9]+)},end:{line:([0-9]+),column:([0-9]+)}}', location_str)
     start_line, start_col, end_line, end_col = location_regex.groups()
@@ -140,6 +173,9 @@ def parse_location(location_str):
         'end_line': end_line, 
         'end_col': end_col
     }
+
+def node_str(tx, node):
+    return get_code_expression(getChildsOf(tx, node))[0]
 
 
 def generate_report(vulnerabilities, report):
@@ -156,14 +192,10 @@ def generate_report(vulnerabilities, report):
             
             # tag is actually source
             report_readable = f'''
-([*] Tags: {repr(vulnerability['tags'])})
-
-Source type
-Sink type (not that important)
-
-[*] NodeId: {repr(vulnerability['node_id'])}
+[*] Source type: {vulnerability['source_type']}
+[*] Sink type: {vulnerability['sink_type']}
+[*] Node Id: {repr(vulnerability['node_id'])}
 [*] Location: {loc_str}
-[*] Sink function: {vulnerability['function']}
 [*] Template: {vulnerability['template']}
 [*] Top Expression: {vulnerability['top_expression']}\n\n'''
 
@@ -196,35 +228,41 @@ def analyze_sink_type(tx, label, fn, args=()):
         if do_reachability_analysis(tx, node=expr_node) == 'unreachable':
             label = 'NON-REACH'
 
-        print('Find slices')
+        print(arg_top_node)
         slices = get_varname_value_from_context(arg_top_node['Code'], expr_node)
-        print('Found slices')
         slices_format = [{'code': code, 'location': parse_location(location)} for code, _, _, location in slices]
-        
-        window_match = False if label != 'getElementById()' else True
+
+        source = None
         script_match = False if label == 'document.appendChild()' else True
 
         for code, args, ids, location in slices:
 
-            window_match = True if window_match else CLOBBERING_REGEX.search(code)
+            if source or 'window' in ids:
+                result = get_vulnerable_source(tx, ids['window'])
+                if result and result['prop_node']['Code'] not in WINDOW_PREDEFINED_PROPERTIES:
+                    source = result
+
             script_match = True if script_match else SCRIPT_REGEX.search(code)
 
-            if window_match and script_match:
+            if source and script_match:
 
                 vulnerabilities.append({
                     'tags': [label.upper()],
+                    'sink_type': label,
+                    'source_type': node_str(tx, source['member_node']),
                     'node_id': {
                         'top_expression': expr_node['Id'],
                         'sink_expression': stmt_node['Id'],
                         'argument': arg_top_node['Id']
                     },
-                    'function': label,
-                    'template': get_code_expression(getChildsOf(tx, arg_node))[0],
+                    'template': node_str(tx, arg_node),
                     'location': parse_location(expr_node['Location']),
-                    'top_expression': get_code_expression(getChildsOf(tx, expr_node))[0],
-                    'variable': arg_top_node['Code'],
+                    'top_expression': node_str(tx, expr_node),
+                    'variable': source['id_node']['Code'],
                     'slices': slices_format
                 })
+
+                break
 
     return vulnerabilities
 
