@@ -29,9 +29,9 @@ from hpg_neo4j.query_utility import getChildsOf, get_code_expression
 
 from hpg_analysis.dom_clobbering.const import WINDOW_PREDEFINED_PROPERTIES
 
-# Setup logging
+# Setup logging (Enable Neo4j logging level=logging.DEBUG)
 
-logging.basicConfig(format='%(asctime)s (%(name)s) [%(levelname)s] %(funcName)s(): %(message)s')
+logging.basicConfig(format='%(asctime)s (%(name)s) [%(levelname)s] %(funcName)s(): %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 LOGGER = logging.getLogger('dom-clobbering')
 LOGGER.setLevel(logging.DEBUG)
 
