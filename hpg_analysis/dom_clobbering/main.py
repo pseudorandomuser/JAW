@@ -1,14 +1,21 @@
+# Import standard Python libraries
+
 import re
 import os
 import sys
 import json
+import logging
 import argparse
 import subprocess
 
 from neo4j import GraphDatabase
 
+# Add project root to PATH
+
 PROJECT_ROOT = os.path.join(os.path.dirname(sys.argv[0]), f'..{os.path.sep}..')
 sys.path.append(PROJECT_ROOT)
+
+# Import project modules
 
 import constants
 
@@ -22,8 +29,13 @@ from hpg_neo4j.query_utility import getChildsOf, get_code_expression
 
 from hpg_analysis.dom_clobbering.const import WINDOW_PREDEFINED_PROPERTIES
 
+# Setup logging
 
-DEBUG = True
+logging.basicConfig(format='%(asctime)s (%(name)s) [%(levelname)s] %(funcName)s(): %(message)s')
+LOGGER = logging.getLogger('dom-clobbering')
+LOGGER.setLevel(logging.DEBUG)
+
+# Other constants
 
 SCRIPT_REGEX = re.compile('document\.createElement\([\'|"](script)[\'|"]\)')
 
@@ -68,11 +80,11 @@ def get_property_assignment_sinks(tx, property, obj=None):
     '''
         WHERE right_expr.Type = 'Identifier' OR right_expr.Type = 'MemberExpression'''
 
-    if DEBUG: print(query)
+    LOGGER.debug(query)
 
     db_result = tx.run(query)
 
-    if DEBUG: print('OK')
+    LOGGER.debug('OK')
 
     for r in db_result:
         for arg_id_node in get_id_nodes(tx, r['right_expr']):
@@ -109,11 +121,11 @@ def get_complex_call_sinks(tx, n_args, func, obj=None):
         RETURN expr_node, call_expr%s;
     ''' % (arg_node_query_slices, callee_props, callee_locator, callee_where, arg_node_returns)
 
-    if DEBUG: print(query)
+    LOGGER.debug(query)
 
     db_result = tx.run(query)
 
-    if DEBUG: print('OK')
+    LOGGER.debug('OK')
 
     for result in db_result:
         expr_node = result['expr_node']
@@ -129,7 +141,7 @@ def get_top_obj(tx, node):
     if node['Type'] == 'Identifier':
         return node
     query = 'MATCH ({Id: "%s"})-[:AST_parentOf*1..10 {RelationType: "object"}]->(top {Type: "Identifier"}) RETURN top;' % node['Id']
-    if DEBUG: print(query)
+    LOGGER.debug(query)
     results = tx.run(query)
     for result in results:
         return result['top']
@@ -143,7 +155,7 @@ def get_id_nodes(tx, node):
         WHERE ALL (rel IN rels WHERE rel.RelationType = "object" OR rel.RelationType = "left" OR rel.RelationType = "right")
         RETURN id_node;
     ''' % node['Id']
-    if DEBUG: print(query)
+    LOGGER.debug(query)
     return [r['id_node'] for r in tx.run(query)]
 
 
@@ -214,16 +226,15 @@ def analyze_sink_type(tx, label, fn, args=()):
 
     for expr_node, stmt_node, arg_node, arg_top_node in fn(tx, *args):
 
-        if DEBUG:
-            print(expr_node)
-            print(stmt_node)
-            print(arg_node)
-            print(arg_top_node)
+        LOGGER.debug(expr_node)
+        LOGGER.debug(stmt_node)
+        LOGGER.debug(arg_node)
+        LOGGER.debug(arg_top_node)
 
         if do_reachability_analysis(tx, node=expr_node) == 'unreachable':
             label = 'NON-REACH'
 
-        print(arg_top_node)
+        LOGGER.debug(arg_top_node)
         slices = get_varname_value_from_context(arg_top_node['Code'], expr_node)
         slices_format = [{'code': code, 'location': parse_location(location)} for code, _, _, location in slices]
 
@@ -318,7 +329,7 @@ def generate_graph(relative_path, full_path):
         'node', '--max-old-space-size=32000', constants.ANALYZER_DRIVER_PATH, 
         '-js', program_path_name, '-o', relative_path
     ]
-    print(' '.join(node_args))
+    LOGGER.debug(' '.join(node_args))
     node_proc = subprocess.Popen(node_args, stdout=subprocess.PIPE)
     if constants.DEBUG_PRINTS:
         for line in node_proc.stdout:
@@ -336,13 +347,13 @@ def import_site_data(site_id=0, site_url=None, use_url_id=False, generate_only=F
     node_path = os.path.join(full_path, constants.NODE_INPUT_FILE_NAME)
     rels_path = os.path.join(full_path, constants.RELS_INPUT_FILE_NAME)
     if not overwrite and os.path.exists(node_path) and os.path.exists(rels_path):
-        print('Graph already exists, skipping...')
+        LOGGER.info('Graph already exists, skipping...')
     else: generate_graph(relative_path, full_path)
 
     if not generate_only:
         API_neo4j_prepare(full_path)
 
-    print('Done!')
+    LOGGER.info('Done!')
 
 
 if __name__ == '__main__':
