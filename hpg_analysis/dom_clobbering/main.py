@@ -121,12 +121,7 @@ def get_complex_call_sinks(tx, n_args, func, obj=None):
         for i in range(0, n_args):
             arg_node = result['arg_node_%d' % i]
             for arg_id_node in get_id_nodes(tx, arg_node):
-                results.append((expr_node, call_expr, arg_node, arg_id_node))
-            '''arg = get_top_obj(tx, arg_node)
-            if arg and arg['Type'] == 'Identifier':
-                results.append((expr_node, call_expr, arg_node, arg))
-            else:
-                if DEBUG: print('NOT ARG!')   '''         
+                results.append((expr_node, call_expr, arg_node, arg_id_node))       
     return results
 
 
