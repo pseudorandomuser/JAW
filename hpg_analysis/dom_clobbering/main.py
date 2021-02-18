@@ -33,7 +33,7 @@ from hpg_analysis.dom_clobbering.const import WINDOW_PREDEFINED_PROPERTIES
 
 logging.basicConfig(format='%(asctime)s (%(name)s) [%(levelname)s] %(funcName)s(): %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 LOGGER = logging.getLogger('dom-clobbering')
-LOGGER.setLevel(logging.DEBUG)
+LOGGER.setLevel(logging.INFO)
 
 # Other constants
 
@@ -137,22 +137,15 @@ def get_complex_call_sinks(tx, n_args, func, obj=None):
     return results
 
 
-def get_top_obj(tx, node):
-    if node['Type'] == 'Identifier':
-        return node
-    query = 'MATCH ({Id: "%s"})-[:AST_parentOf*1..10 {RelationType: "object"}]->(top {Type: "Identifier"}) RETURN top;' % node['Id']
-    LOGGER.debug(query)
-    results = tx.run(query)
-    for result in results:
-        return result['top']
-    return None
-
-
 def get_id_nodes(tx, node):
     if node['Type'] == 'Identifier':
         return [node]
     query = '''MATCH ({Id: "%s"})-[rels:AST_parentOf*1..10]->(id_node {Type: "Identifier"})
-        WHERE ALL (rel IN rels WHERE rel.RelationType = "object" OR rel.RelationType = "left" OR rel.RelationType = "right")
+        WHERE ALL (rel IN rels WHERE 
+            rel.RelationType = "object" OR 
+            rel.RelationType = "left" OR 
+            rel.RelationType = "right"
+        )
         RETURN id_node;
     ''' % node['Id']
     LOGGER.debug(query)
@@ -160,7 +153,8 @@ def get_id_nodes(tx, node):
 
 
 def get_vulnerable_source(tx, id):
-    query = '''MATCH (decl_node {Type: "VariableDeclarator"})-[:AST_parentOf {RelationType: "id"}]->(id_node {Type: "Identifier"}), 
+    query = '''MATCH (decl_node {Type: "VariableDeclarator"})
+                -[:AST_parentOf {RelationType: "id"}]->(id_node {Type: "Identifier"}), 
             (decl_node)-[:AST_parentOf*1..10]->(member_node {Type: "MemberExpression"})
                 -[:AST_parentOf*1..10 {RelationType: "object"}]->(wnd_node {Id: "%s"}),
             (member_node)-[:AST_parentOf {RelationType: "property"}]->(prop_node) 
