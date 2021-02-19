@@ -5,7 +5,7 @@ var program_path = process.argv[2];
 var code = fs.readFileSync(program_path, "utf8");
 
 try {
-    esprima.parse(code, {range: true, loc: true, tolerant: true})
+    esprima.parse(code, {range: true, loc: true})
     console.log('Parsing successful!');
     process.exit(0);
 } catch (error) {
