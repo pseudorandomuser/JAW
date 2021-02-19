@@ -65,8 +65,6 @@ class Report:
 
 def get_property_assignment_sinks(tx, property, obj=None):
 
-    results = []
-
     obj_slice = ''
     if obj is not None:
         obj_slice = ',\n(left_expr)-[:AST_parentOf*1..5 {RelationType: "object"}]->(object_node {Type: "Identifier", Code: "%s"})' % obj
@@ -88,14 +86,10 @@ def get_property_assignment_sinks(tx, property, obj=None):
 
     for r in db_result:
         for arg_id_node in get_id_nodes(tx, r['right_expr']):
-            results.append((r['expr_node'], r['assign_expr'], r['right_expr'], arg_id_node))
-    
-    return results
+            yield (r['expr_node'], r['assign_expr'], r['right_expr'], arg_id_node)
 
 
 def get_complex_call_sinks(tx, n_args, func, obj=None):
-
-    results = []
 
     arg_node_query_slices = ''
     arg_node_returns = ''
@@ -133,13 +127,12 @@ def get_complex_call_sinks(tx, n_args, func, obj=None):
         for i in range(0, n_args):
             arg_node = result['arg_node_%d' % i]
             for arg_id_node in get_id_nodes(tx, arg_node):
-                results.append((expr_node, call_expr, arg_node, arg_id_node))       
-    return results
+                yield (expr_node, call_expr, arg_node, arg_id_node)
 
 
 def get_id_nodes(tx, node):
     if node['Type'] == 'Identifier':
-        return [node]
+        yield node
     query = '''MATCH ({Id: "%s"})-[rels:AST_parentOf*1..10]->(id_node {Type: "Identifier"})
         WHERE ALL (rel IN rels WHERE 
             rel.RelationType = "object" OR 
@@ -149,7 +142,8 @@ def get_id_nodes(tx, node):
         RETURN id_node;
     ''' % node['Id']
     LOGGER.debug(query)
-    return [r['id_node'] for r in tx.run(query)]
+    for result in tx.run(query):
+        yield result['id_node']
 
 
 def get_vulnerable_source(tx, id):
