@@ -6,8 +6,8 @@ import math
 import subprocess
 
 
-SITE_ID_MIN = 11
-SITE_ID_MAX = 15
+SITE_ID_MIN = 1
+SITE_ID_MAX = 150
 REQUIRED_VALID = 1
 
 PROJECT_ROOT = os.path.join(os.path.dirname(sys.argv[0]), f'..{os.path.sep}..')
@@ -22,8 +22,20 @@ def parse_js(program_path):
     return node_proc.returncode == 0
 
 def get_progress_bar(current, max, width=20):
+    running_symbols = ['|', '/', '-', '\\']
+    running_symbol = running_symbols[current % len(running_symbols)] if current < max else '✔'
     progress = math.ceil((current / max) * width)
-    return '[' + (progress * '#') + ((width - progress) * ' ') + ']'
+    return '[' + (progress * '#') + ((width - progress) * ' ') + '] ' + running_symbol
+
+def get_pacman_bar(current, max, width=20):
+    item_symbol = '•'
+    progress_symbols = ['ᗧ', '○']
+    running_symbols = ['|', '/', '-', '\\']
+    running_symbol = running_symbols[current % len(running_symbols)]
+    progress = math.ceil((current / max) * width)
+    if current == max:
+        return '[' + width * '#' + '] ✔'
+    return '[' + (progress - 1) * ' ' + progress_symbols[current % len(progress_symbols)] + (width - progress) * item_symbol + '] ' + running_symbol
 
 
 if __name__ == '__main__':
@@ -62,7 +74,7 @@ if __name__ == '__main__':
                 if parse_js(url_prog):
                     parsable_urls.append(url_hash)
 
-                progress_bar = get_progress_bar(current_index + 1, site_urls_count, width=40)
+                progress_bar = get_pacman_bar(current_index + 1, site_urls_count, width=40)
                 valid_count = len(parsable_urls)
                 invalid_count = current_index + 1 - valid_count
                 print(f'{progress_bar} ({current_index + 1}/{site_urls_count}) ({valid_count} OK, {invalid_count} FAIL)', end='\r', flush=True)
