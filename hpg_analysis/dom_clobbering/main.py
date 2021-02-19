@@ -13,6 +13,7 @@ from neo4j import GraphDatabase
 # Add project root to PATH
 
 PROJECT_ROOT = os.path.join(os.path.dirname(sys.argv[0]), f'..{os.path.sep}..')
+CLOBBER_ROOT = os.path.join(PROJECT_ROOT, f'hpg_analysis{os.path.sep}dom_clobbering')
 sys.path.append(PROJECT_ROOT)
 
 # Import project modules
@@ -316,6 +317,9 @@ def run_analysis(report):
 
 def generate_graph(relative_path, full_path):
     program_path_name = os.path.join(full_path, 'js_program.js')
+
+    LOGGER.debug('Parser returned %s' % str(parse_js(program_path_name)))
+
     node_args = [
         'node', '--max-old-space-size=32000', constants.ANALYZER_DRIVER_PATH, 
         '-js', program_path_name, '-o', relative_path
@@ -327,6 +331,14 @@ def generate_graph(relative_path, full_path):
             print(line.decode('UTF-8'))
     node_proc.wait()
     return node_proc.returncode
+
+
+def parse_js(path):
+    proc = subprocess.Popen([
+        'node', os.path.join(CLOBBER_ROOT, 'parse.js'), path
+    ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    proc.wait()
+    return proc.returncode == 0
 
 
 def import_site_data(site_id=0, url_id=None, url=None, generate_only=False, overwrite=False):

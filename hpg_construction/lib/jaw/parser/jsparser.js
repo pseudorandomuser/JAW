@@ -32,7 +32,7 @@ function JSParser() {
  */
 JSParser.prototype.parseAST = function (code, options) {
 	'use strict';
-	var optionObj = options || {range: true, loc: true};
+	var optionObj = /*options || */{range: true, loc: true, tolerant: true};
 	if (!optionObj.range) {
 		optionObj.range = true;
 	}
