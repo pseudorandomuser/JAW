@@ -33,7 +33,7 @@ from hpg_analysis.dom_clobbering.const import WINDOW_PREDEFINED_PROPERTIES
 
 logging.basicConfig(format='%(asctime)s (%(name)s) [%(levelname)s] %(funcName)s(): %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 LOGGER = logging.getLogger('dom-clobbering')
-LOGGER.setLevel(logging.INFO)
+LOGGER.setLevel(logging.DEBUG)
 
 # Other constants
 
@@ -329,9 +329,9 @@ def generate_graph(relative_path, full_path):
     return node_proc.returncode
 
 
-def import_site_data(site_id=0, site_url=None, use_url_id=False, generate_only=False, overwrite=False):
+def import_site_data(site_id=0, url_id=None, url=None, generate_only=False, overwrite=False):
 
-    url_hash = site_url if use_url_id else _hash(site_url)
+    url_hash = url_id if url_id else _hash(url)
     relative_path = os.path.join(str(site_id), url_hash)
     full_path = os.path.join(os.path.join(PROJECT_ROOT, f'hpg_construction{os.path.sep}outputs'), relative_path)
     
@@ -339,7 +339,9 @@ def import_site_data(site_id=0, site_url=None, use_url_id=False, generate_only=F
     rels_path = os.path.join(full_path, constants.RELS_INPUT_FILE_NAME)
     if not overwrite and os.path.exists(node_path) and os.path.exists(rels_path):
         LOGGER.info('Graph already exists, skipping...')
-    else: generate_graph(relative_path, full_path)
+    else:
+        graph_ret = generate_graph(relative_path, full_path)
+        LOGGER.debug('Graph generation returned %d' % graph_ret)
 
     if not generate_only:
         API_neo4j_prepare(full_path)
@@ -356,15 +358,14 @@ if __name__ == '__main__':
 
     import_parser = sub_parsers.add_parser('import')
 
-    import_group = import_parser.add_mutually_exclusive_group(required=True)
-    import_group.add_argument('--id',  metavar='id', type=int, help='ID of the website to import')
+    import_parser.add_argument('--id',  metavar='id', type=int, help='ID of the website to import')
 
-    import_parser.add_argument('--url', metavar='url', type=str, help='URL of the site to import')
-    import_parser.add_argument('--url_id', action='store_true', help='Use the URL ID as is without re-hashing')
+    import_id_group = import_parser.add_mutually_exclusive_group(required=True)
+    import_id_group.add_argument('--url_id', metavar='id', type=str, help='URL ID of the site')
+    import_id_group.add_argument('--url', metavar='url', type=str, help='URL of the site to import')
 
-    import_ex_group = import_parser.add_mutually_exclusive_group()
-    import_ex_group.add_argument('--generate_only', action='store_true', help='Only generate graph without importing')
-    import_ex_group.add_argument('--overwrite', action='store_true', help='Overwrite graph if files already exist')
+    import_parser.add_argument('--generate_only', action='store_true', help='Only generate graph without importing')
+    import_parser.add_argument('--overwrite', action='store_true', help='Overwrite graph if files already exist')
 
     analysis_parser = sub_parsers.add_parser('analyze')
     analysis_parser.add_argument('--out', metavar='filename', type=str, help='Path to output the analysis report to')
@@ -377,6 +378,6 @@ if __name__ == '__main__':
         run_analysis(report)
         report.close()
     elif args.action == 'import':
-        import_site_data(args.id, args.url, args.url_id, args.generate_only, args.overwrite)
+        import_site_data(args.id, args.url_id, args.url, args.generate_only, args.overwrite)
     else:
         sys.exit(-1)

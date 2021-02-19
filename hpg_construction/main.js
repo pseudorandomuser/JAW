@@ -70,5 +70,5 @@ function main(){
     console.log('[+] started code property graph analyzer...');
     await main();
     console.log('[+] code property graph analyzer finished!');
-    setTimeout(process.exit, 5000);
+    //setTimeout(process.exit, 5000);
 })();
