@@ -1,9 +1,5 @@
 import os
 
-CLOBBER_ROOT = os.path.dirname(__file__)
-PROJECT_ROOT = os.path.join(CLOBBER_ROOT, f'..{os.path.sep}..')
-CLOBBER_DATA = os.path.join(PROJECT_ROOT, f'hpg_construction{os.path.sep}outputs')
-
 WINDOW_PREDEFINED_PROPERTIES = [
     'closed',
     'console',

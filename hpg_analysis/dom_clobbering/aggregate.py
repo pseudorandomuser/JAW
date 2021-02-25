@@ -5,19 +5,19 @@ import ast
 import json
 import math
 
-from .const import PROJECT_ROOT, CLOBBER_ROOT, CLOBBER_DATA
+import constants
 
 
 if __name__ == '__main__':
 
-    parsable_path = os.path.join(CLOBBER_ROOT, 'parse.json')
+    parsable_path = os.path.join(constants.CLOBBER_ROOT, 'parse.json')
     parsable_handle = open(parsable_path, 'r')
     parsable_dict = json.load(parsable_handle)
     parsable_handle.close()
 
     categories_dict = {}
     categories_regex = re.compile('^([0-9]+)- http://(.*) - (\[.*\])')
-    categories_path = os.path.join(CLOBBER_ROOT, 'categories.txt')
+    categories_path = os.path.join(constants.CLOBBER_ROOT, 'categories.txt')
     categories_handle = open(categories_path, 'r')
     for line in categories_handle.readlines():
         site_id, site_domain, site_categories_str = categories_regex.match(line).groups()
@@ -38,7 +38,7 @@ if __name__ == '__main__':
         site_urls_aggregated = []
 
         for site_url in site_urls:
-            site_path = os.path.join(CLOBBER_DATA, site_id)
+            site_path = os.path.join(constants.CLOBBER_DATA, site_id)
             site_url_path = os.path.join(site_path, site_url)
             site_url_prog_path = os.path.join(site_url_path, 'js_program.js')
             site_url_text_path = os.path.join(site_url_path, 'navigation_url.out')
@@ -67,7 +67,7 @@ if __name__ == '__main__':
     aggregated_dict_sorted = { key: aggregated_dict[key] for key in 
         sorted(aggregated_dict, key=lambda x: aggregated_dict.get(x).get('script_size_avg')) }
 
-    categories_filtered_path = os.path.join(CLOBBER_ROOT, 'categories_filtered.txt')
+    categories_filtered_path = os.path.join(constants.CLOBBER_ROOT, 'categories_filtered.txt')
     categories_filtered_handle = open(categories_filtered_path, 'w')
     for site_id in aggregated_dict_sorted.keys():
         site_info = categories_dict[site_id]
@@ -78,7 +78,7 @@ if __name__ == '__main__':
 
     result = json.dumps(aggregated_dict_sorted, indent=4)
 
-    result_path = os.path.join(CLOBBER_ROOT, 'aggregate.json')
+    result_path = os.path.join(constants.CLOBBER_ROOT, 'aggregate.json')
     file_handle = open(result_path, 'w')
     file_handle.write(result)
     file_handle.close()

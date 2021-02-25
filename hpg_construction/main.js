@@ -70,13 +70,4 @@ function main(){
     console.log('[+] started code property graph analyzer...');
     await main();
     console.log('[+] code property graph analyzer finished!');
-    console.log('[+] Waiting 10 seconds to prevent file corruption');
-    setTimeout(function(){
-        /*const { spawn } = require('child_process');
-        var pid = process.pid;
-        console.log('[+] Killing process with PID ' + pid);
-        const kill = spawn('kill', ['-9', pid]);*/
-        console.log('[+] Exiting...');
-        process.exit(0);
-    }, 10000);
 })();

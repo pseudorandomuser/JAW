@@ -10,11 +10,6 @@ import subprocess
 
 from neo4j import GraphDatabase
 
-# Add project root to PATH
-
-from .const import PROJECT_ROOT, CLOBBER_ROOT, CLOBBER_DATA
-sys.path.append(PROJECT_ROOT)
-
 # Import project modules
 
 import constants
@@ -325,7 +320,7 @@ def generate_graph(relative_path, full_path):
 
 def parse_js(path):
     proc = subprocess.Popen([
-        'node', os.path.join(CLOBBER_ROOT, 'parse.js'), path
+        'node', os.path.join(constants.CLOBBER_ROOT, 'parse.js'), path
     ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     proc.wait()
     return proc.returncode == 0
@@ -335,7 +330,7 @@ def import_site_data(site_id=0, url_id=None, url=None, generate_only=False, over
 
     url_hash = url_id if url_id else _hash(url)
     relative_path = os.path.join(str(site_id), url_hash)
-    full_path = os.path.join(os.path.join(PROJECT_ROOT, f'hpg_construction{os.path.sep}outputs'), relative_path)
+    full_path = os.path.join(os.path.join(constants.BASE_DIR, f'hpg_construction{os.path.sep}outputs'), relative_path)
     
     node_path = os.path.join(full_path, constants.NODE_INPUT_FILE_NAME)
     rels_path = os.path.join(full_path, constants.RELS_INPUT_FILE_NAME)
@@ -353,7 +348,7 @@ def import_site_data(site_id=0, url_id=None, url=None, generate_only=False, over
 
 if __name__ == '__main__':
 
-    jaw_data_path = os.path.join(PROJECT_ROOT, f'..{os.path.sep}JAWData')
+    jaw_data_path = os.path.join(constants.BASE_DIR, f'..{os.path.sep}JAWData')
 
     main_parser = argparse.ArgumentParser(description='Large Scale Analysis of DOM Clobbering Vulnerabilities')
     sub_parsers = main_parser.add_subparsers(dest='action', required=True)

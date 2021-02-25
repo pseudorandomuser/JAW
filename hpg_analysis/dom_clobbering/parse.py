@@ -1,20 +1,23 @@
 import os
-import re
 import sys
 import json
 import math
+import hashlib
 import subprocess
 
-from .const import *
+import constants
 
 
 SITE_ID_MIN = 1
 SITE_ID_MAX = 150
 REQUIRED_VALID = 20
 SCRIPT_SIZE_MIN = 100_000
-SCRIPT_SIZE_MAX = 10_000_000
+SCRIPT_SIZE_MAX = 2_000_000
 CONSTRAINT_SIZE = True
 CONSTRAINT_WINDOW = True
+CONSTRAINT_HASH = True
+
+HASHES = []
 
 def prevalidate_constraints(program_path):
 
@@ -23,23 +26,26 @@ def prevalidate_constraints(program_path):
 
     constraints = True
 
-    if not CONSTRAINT_SIZE and not CONSTRAINT_WINDOW:
-        return constraints
-
     if CONSTRAINT_SIZE:
         file_size = os.path.getsize(program_path)
         constraints = constraints and file_size > SCRIPT_SIZE_MIN and file_size < SCRIPT_SIZE_MAX
     
     if CONSTRAINT_WINDOW:
         with open(program_path, 'r') as file_handle:
-            window_regex = re.compile('window\.')
             file_content = file_handle.read()
-            constraints = constraints and window_regex.search(file_content) != None
+            constraints = constraints and 'window.' in file_content
+
+    if CONSTRAINT_HASH:
+        with open(program_path, 'rb') as file_handle:
+            digest = hashlib.md5(file_handle.read()).hexdigest()
+            constraints = constraints and digest not in HASHES
+            if not digest in HASHES:
+                HASHES.append(digest)
 
     return constraints
 
 def parse_js(program_path):
-    node_proc = subprocess.Popen(['node', os.path.join(CLOBBER_ROOT, 'parse.js'), program_path])
+    node_proc = subprocess.Popen(['node', os.path.join(constants.CLOBBER_ROOT, 'parse.js'), program_path])
     node_proc.wait()
     return node_proc.returncode == 0
 
@@ -74,7 +80,7 @@ if __name__ == '__main__':
 
         print(f'\nAttempting to parse JavaScript from URLs of site with ID {site_id}... ', flush=True)
 
-        site_path = os.path.join(CLOBBER_DATA, str(site_id))
+        site_path = os.path.join(constants.CLOBBER_DATA, str(site_id))
 
         if not os.path.isdir(site_path):
             print(f'Site with ID {site_id} does not exist, skipping...', end='', flush=True)
@@ -112,7 +118,7 @@ if __name__ == '__main__':
 
     result = json.dumps(parsable_sites, indent=4)
 
-    result_path = os.path.join(CLOBBER_ROOT, 'parse.json')
+    result_path = os.path.join(constants.CLOBBER_ROOT, 'parse.json')
     file_handle = open(result_path, 'w')
     file_handle.write(result)
     file_handle.close()

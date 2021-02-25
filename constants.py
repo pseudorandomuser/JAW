@@ -26,7 +26,9 @@
 
 import os, sys
 
-BASE_DIR= os.path.dirname(os.path.realpath(__file__))
+BASE_DIR = os.path.dirname(os.path.realpath(__file__))
+CLOBBER_ROOT = os.path.join(BASE_DIR, f'hpg_analysis{os.path.sep}dom_clobbering')
+CLOBBER_DATA = os.path.join(BASE_DIR, f'hpg_construction{os.path.sep}outputs')
 
 
 # Supported Platform List
