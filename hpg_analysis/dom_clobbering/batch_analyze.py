@@ -32,7 +32,7 @@ if __name__ == '__main__':
             url_report_path = os.path.join(report_path, f'{url_hash}.txt')
 
             print(f'Importing URL with hash {url_hash}...')
-            import_site_data(site_id=int(site_id), url_id=url_hash)
+            import_site_data(site_id=int(site_id), url_id=url_hash, overwrite=False)
 
             print(f'Analyzing URL with hash {url_hash}...')
             run_analysis(url_report_path, True)
