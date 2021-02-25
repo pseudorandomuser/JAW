@@ -84,7 +84,7 @@ if __name__ == '__main__':
                     run_analysis(url_report_path, True)
                     num_analyze += 1
                     break
-                except ServiceUnavailable, err:
+                except ServiceUnavailable:
                     print(f'Analysis failed, retrying... {num_retries+1}/{MAX_RETRIES}')
                     time.sleep(FAIL_DELAY)
                     num_retries += 1
