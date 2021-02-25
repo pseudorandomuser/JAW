@@ -33,6 +33,7 @@ import hpg_neo4j.db_utility as DU
 import constants as constantsModule
 import neomodel
 
+import jsbeautifier
 
 ## ------------------------------------------------------------------------------- ## 
 ## Utility Functions
