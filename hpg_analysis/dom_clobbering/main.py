@@ -150,48 +150,53 @@ def node_str(tx, node):
     return get_code_expression(getChildsOf(tx, node))[0]
 
 def write_all(file, text):
-    file.write(text)
-    file.flush()
+    if file:
+        file.write(text)
+        file.flush()
     sys.stdout.write(text)
     sys.stdout.flush()
 
 def generate_report(vulnerabilities, out_path, make_json):
 
-    if make_json:
+    if make_json and out_path:
         simple_path = os.path.splitext(out_path)[0]
         with open(f'{simple_path}.json', 'w') as json_report:
             write_all(json_report, json.dumps(vulnerabilities, indent = 4))
 
     print('\n')
 
-    with open(out_path, 'w') as report:
-        vulnerability_count = 1
-        for vulnerability in vulnerabilities:
+    report = open(out_path, 'w') if out_path else None
 
-            loc = vulnerability['location']
-            loc_str = f"{loc['start_line']}:{loc['start_col']}"
+    vulnerability_count = 1
+    for vulnerability in vulnerabilities:
+
+        loc = vulnerability['location']
+        loc_str = f"{loc['start_line']}:{loc['start_col']}"
             
-            # tag is actually source
-            report_readable = f'''[*] Source type: {vulnerability['source_type']}
+        # tag is actually source
+        report_readable = f'''[*] Source type: {vulnerability['source_type']}
 [*] Sink type: {vulnerability['sink_type']}
 [*] Node Id: {repr(vulnerability['node_id'])}
 [*] Location: {loc_str}
 [*] Template: {vulnerability['template']}
 [*] Top Expression: {vulnerability['top_expression']}\n\n'''
 
-            write_all(report, report_readable)
-            write_all(report, f"{vulnerability_count}:{repr(vulnerability['tags'])} variable = {vulnerability['variable']}\n")
-            write_all(report, f"\t(loc:{loc_str}) {vulnerability['top_expression']}\n")
+        write_all(report, report_readable)
+        write_all(report, f"{vulnerability_count}:{repr(vulnerability['tags'])} variable = {vulnerability['variable']}\n")
+        write_all(report, f"\t(loc:{loc_str}) {vulnerability['top_expression']}\n")
 
-            for slice in vulnerability['slices']:
-                loc = slice['location']
-                loc_str = f"{loc['start_line']}:{loc['start_col']}"
-                write_all(report, f"\t(loc:{loc_str}) {slice['code']}\n")
+        for slice in vulnerability['slices']:
+            loc = slice['location']
+            loc_str = f"{loc['start_line']}:{loc['start_col']}"
+            write_all(report, f"\t(loc:{loc_str}) {slice['code']}\n")
 
-            vulnerability_count += 1
+        vulnerability_count += 1
     
-            if vulnerability_count < len(vulnerabilities) + 1:
-                write_all(report, '\n')
+        if vulnerability_count < len(vulnerabilities) + 1:
+            write_all(report, '\n')
+
+    if report:
+        report.close()
 
 
 def analyze_sink_type(tx, label, fn, args=()):
@@ -216,7 +221,7 @@ def analyze_sink_type(tx, label, fn, args=()):
 
         for code, args, ids, location in slices:
 
-            if source or 'window' in ids:
+            if not source and 'window' in ids:
                 result = get_vulnerable_source(tx, ids['window'])
                 if result and result['prop_node']['Code'] not in WINDOW_PREDEFINED_PROPERTIES:
                     source = result
