@@ -5,6 +5,8 @@ import json
 import math
 import subprocess
 
+from .const import *
+
 
 SITE_ID_MIN = 1
 SITE_ID_MAX = 150
@@ -13,11 +15,6 @@ SCRIPT_SIZE_MIN = 100_000
 SCRIPT_SIZE_MAX = 10_000_000
 CONSTRAINT_SIZE = True
 CONSTRAINT_WINDOW = True
-
-PROJECT_ROOT = os.path.join(os.path.dirname(sys.argv[0]), f'..{os.path.sep}..')
-CLOBBER_ROOT = os.path.join(PROJECT_ROOT, f'hpg_analysis{os.path.sep}dom_clobbering')
-CLOBBER_DATA = os.path.join(PROJECT_ROOT, f'hpg_construction{os.path.sep}outputs')
-
 
 def prevalidate_constraints(program_path):
 

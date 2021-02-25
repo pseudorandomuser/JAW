@@ -5,10 +5,7 @@ import ast
 import json
 import math
 
-
-PROJECT_ROOT = os.path.join(os.path.dirname(sys.argv[0]), f'..{os.path.sep}..')
-CLOBBER_ROOT = os.path.join(PROJECT_ROOT, f'hpg_analysis{os.path.sep}dom_clobbering')
-CLOBBER_DATA = os.path.join(PROJECT_ROOT, f'hpg_construction{os.path.sep}outputs')
+from .const import PROJECT_ROOT, CLOBBER_ROOT, CLOBBER_DATA
 
 
 if __name__ == '__main__':
