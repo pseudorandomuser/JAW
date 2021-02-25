@@ -23,16 +23,16 @@ if __name__ == '__main__':
         if not os.path.isdir(report_path):
             os.makedirs(report_path)
 
-        url_hashes = [ dir for dir in os.listdir(site_path) if os.path.isdir(os.path.join(site_path, dir)) ]
+        url_hashes = [ dir for dir in os.listdir(site_path) if os.path.isdir(os.path.join(site_path, dir)) and f'{dir}.txt' not in os.listdir(report_path) ]
 
-        for i in range(0, 20):
+        for i in range(0, min(len(url_hashes), 20)):
 
             url_hash = random.choice(url_hashes)
             url_hashes.remove(url_hash)
             url_report_path = os.path.join(report_path, f'{url_hash}.txt')
 
             print(f'Importing URL with hash {url_hash}...')
-            import_site_data(site_id=int(site_id), url_id=url_hash, overwrite=False)
+            import_site_data(site_id=int(site_id), url_id=url_hash, overwrite=True)
 
             print(f'Analyzing URL with hash {url_hash}...')
             run_analysis(url_report_path, True)
