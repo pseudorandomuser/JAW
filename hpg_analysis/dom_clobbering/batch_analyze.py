@@ -34,6 +34,10 @@ def graph_import(site_id, url_hash):
         print(f'Nodes or relations missing for site {site_id} URL {url_hash}!')
         return False
 
+    # FIXME: Multiple calls to API_neo4j_prepare in same process
+    #   => "Failed to read from defunct connection"
+    # Solution: Run import routine in separate processes
+
     import_proc = Process(target=db_utility.API_neo4j_prepare, args=(url_path,))
     import_proc.start()
     import_proc.join()
@@ -71,7 +75,7 @@ if __name__ == '__main__':
 
         num_success = 0
 
-        while len(url_hashes) > 0 and num_success < NUM_ANALYZE_URLS:
+        while len(url_hashes) > 0:# and num_success < NUM_ANALYZE_URLS:
 
             url_hash = random.choice(url_hashes)
             url_hashes.remove(url_hash)

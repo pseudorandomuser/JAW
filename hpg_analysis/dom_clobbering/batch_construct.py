@@ -19,7 +19,6 @@ LOGGER.setLevel(logging.DEBUG)
 
 MAX_WORKERS = 32
 KILL_TIMEOUT = 60
-SITE_IDS = [] #old
 
 
 def graph_construction_worker(site_id, url_hash):
@@ -43,10 +42,10 @@ def graph_construction_worker(site_id, url_hash):
             LOGGER.debug(f'({site_id})({url_hash}) Detected CPG finished, breaking...')
             break
     
-    LOGGER.debug(f'({site_id})({url_hash}) Waiting {KILL_TIMEOUT} seconds to kill node...')
+    LOGGER.debug(f'({site_id})({url_hash}) Waiting {KILL_TIMEOUT} seconds for node to terminate...')
     for i in range(0, KILL_TIMEOUT):
         if graph_proc.poll() is not None:
-            LOGGER.debug(f'({site_id})({url_hash}) Node is already dead, skipping timeout!')
+            LOGGER.debug(f'({site_id})({url_hash}) Node is already terminated, skipping timeout!')
             break
         time.sleep(1)
 
