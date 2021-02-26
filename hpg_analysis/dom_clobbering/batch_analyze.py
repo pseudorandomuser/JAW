@@ -11,8 +11,8 @@ from multiprocessing import Process
 
 import constants
 
-from hpg_neo4j import db_utility
-from hpg_analysis.dom_clobbering import main
+from hpg_neo4j.db_utility import API_neo4j_prepare
+from hpg_analysis.dom_clobbering.main import run_analysis
 
 from neo4j.exceptions import ServiceUnavailable
 
@@ -38,7 +38,7 @@ def graph_import(site_id, url_hash):
     #   => "Failed to read from defunct connection"
     # Solution: Run import routine in separate processes
 
-    import_proc = Process(target=db_utility.API_neo4j_prepare, args=(url_path,))
+    import_proc = Process(target=API_neo4j_prepare, args=(url_path,))
     import_proc.start()
     import_proc.join()
 
@@ -91,7 +91,7 @@ if __name__ == '__main__':
             num_retries = 0
             while num_retries < MAX_RETRIES:
                 try:
-                    main.run_analysis(url_report_path, True)
+                    run_analysis(url_report_path, True)
                     num_success += 1
                     break
                 except:
