@@ -88,4 +88,11 @@ if __name__ == '__main__':
         url_hashes = parse_dict[site_id]
 
         for url_hash in url_hashes:
-            executor.submit(graph_construction_worker, site_id, url_hash)
+
+            url_path = os.path.join(site_path, url_hash)
+            prog_path = os.path.join(url_path, 'js_program.js')
+
+            if os.path.isfile(prog_path):
+                executor.submit(graph_construction_worker, site_id, url_hash)
+            else:
+                print(f'({site_id})({url_hash}) JavaScript does not exist, skipping!')
