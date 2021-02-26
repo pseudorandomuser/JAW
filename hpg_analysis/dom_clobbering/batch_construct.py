@@ -65,8 +65,6 @@ def graph_construction_worker(site_id, url_hash):
 if __name__ == '__main__':
 
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        #for site_id in SITE_IDS:
-        #site_id = str(site_id)
 
         if (len(sys.argv) < 2):
             print(f'Usage: f{sys.argv[0]} <site_id>')
@@ -76,11 +74,8 @@ if __name__ == '__main__':
         site_path = os.path.join(constants.CLOBBER_DATA, site_id)
 
         if not os.path.isdir(site_path):
-            #continue
             print(f'Invalid site ID: f{site_id}')
             sys.exit(-1)
-
-        #site_hashes = [ dir for dir in os.listdir(site_path) if os.path.isdir(os.path.join(site_path, dir)) ]
 
         parse_path = os.path.join(constants.CLOBBER_ROOT, 'parse.json')
         parse_handle = open(parse_path, 'r')

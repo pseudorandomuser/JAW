@@ -299,6 +299,8 @@ def run_analysis(out_path, make_json):
                 
             generate_report(vulnerabilities, out_path, make_json)
 
+    database.close()
+
 
 def generate_graph(relative_path, full_path):
     program_path_name = os.path.join(full_path, 'js_program.js')

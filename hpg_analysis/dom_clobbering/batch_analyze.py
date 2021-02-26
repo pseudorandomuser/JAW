@@ -3,12 +3,16 @@ import sys
 import json
 import time
 import random
+import traceback
+import importlib
 import subprocess
 
-from .main import run_analysis
+from multiprocessing import Process
 
 import constants
-from hpg_neo4j.db_utility import API_neo4j_prepare
+
+from hpg_neo4j import db_utility
+from hpg_analysis.dom_clobbering import main
 
 from neo4j.exceptions import ServiceUnavailable
 
@@ -27,9 +31,13 @@ def graph_import(site_id, url_hash):
     rels_path = os.path.join(url_path, constants.RELS_INPUT_FILE_NAME)
 
     if not os.path.isfile(node_path) or not os.path.isfile(rels_path):
+        print(f'Nodes or relations missing for site {site_id} URL {url_hash}!')
         return False
 
-    API_neo4j_prepare(url_path)
+    import_proc = Process(target=db_utility.API_neo4j_prepare, args=(url_path,))
+    import_proc.start()
+    import_proc.join()
+
     return True
 
 
@@ -50,8 +58,6 @@ if __name__ == '__main__':
         if not os.path.isdir(report_path):
             os.makedirs(report_path)
 
-        #url_hashes = [ dir for dir in os.listdir(site_path) if os.path.isdir(os.path.join(site_path, dir)) and f'{dir}.txt' not in os.listdir(report_path) ]
-
         parse_path = os.path.join(constants.CLOBBER_ROOT, 'parse.json')
         parse_handle = open(parse_path, 'r')
         parse_dict = json.load(parse_handle)
@@ -63,9 +69,9 @@ if __name__ == '__main__':
 
         url_hashes = parse_dict[site_id]
 
-        num_analyze = 0
+        num_success = 0
 
-        while len(url_hashes) > 0 and num_analyze < NUM_ANALYZE_URLS:
+        while len(url_hashes) > 0 and num_success < NUM_ANALYZE_URLS:
 
             url_hash = random.choice(url_hashes)
             url_hashes.remove(url_hash)
@@ -81,11 +87,12 @@ if __name__ == '__main__':
             num_retries = 0
             while num_retries < MAX_RETRIES:
                 try:
-                    run_analysis(url_report_path, True)
-                    num_analyze += 1
+                    main.run_analysis(url_report_path, True)
+                    num_success += 1
                     break
-                except ServiceUnavailable:
-                    print(f'Analysis failed, retrying... {num_retries+1}/{MAX_RETRIES}')
+                except:
+                    traceback.print_exc()
+                    print(f'Analysis failed, retrying in {FAIL_DELAY} seconds... {num_retries+1}/{MAX_RETRIES}')
                     time.sleep(FAIL_DELAY)
                     num_retries += 1
 
