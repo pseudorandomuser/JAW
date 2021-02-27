@@ -34,7 +34,7 @@ LOGGER.setLevel(logging.DEBUG)
 
 # Other constants
 
-MAX_TIME_SLICING = 1800.0
+MAX_TIME_SLICING_MINS = 30
 
 SCRIPT_REGEX = re.compile('document\.createElement\([\'|"](script)[\'|"]\)')
 
@@ -44,6 +44,7 @@ def run_query(tx, query):
     r = tx.run(query)
     LOGGER.debug('Query OK')
     return r
+
 
 def get_property_assignment_sinks(tx, property, obj=None):
 
@@ -143,8 +144,10 @@ def parse_location(location_str):
         'end_col': end_col
     }
 
+
 def node_str(tx, node):
     return get_code_expression(getChildsOf(tx, node))[0]
+
 
 def write_all(file, text):
     if file:
@@ -152,6 +155,7 @@ def write_all(file, text):
         file.flush()
     sys.stdout.write(text)
     sys.stdout.flush()
+
 
 def generate_report(vulnerabilities, out_path, make_json):
 
@@ -195,10 +199,48 @@ def generate_report(vulnerabilities, out_path, make_json):
     if report:
         report.close()
 
-def do_slicing(pipe, arg_node, expr_node):
+
+def slicing_routine(pipe, arg_node, expr_node):
+    LOGGER.debug(f'Spawned slicing process with PID {os.getpid()}')
     slices = get_varname_value_from_context(arg_node, expr_node)
     pipe.send(slices)
     pipe.close()
+
+
+def do_multiproc_slicing(arg_id_node, expr_node):
+    LOGGER.debug(f'Spawning slicing process from PID {os.getpid()}...')
+
+    parent_pipe, child_pipe = multiprocessing.Pipe()
+    slicing_proc = multiprocessing.Process(target=slicing_routine, args=(child_pipe, arg_id_node['Code'], expr_node))
+    slicing_proc.start()
+
+    slicing_result_present = False
+    for i in range(0, MAX_TIME_SLICING_MINS):
+        slicing_result_present = parent_pipe.poll(60)
+        if slicing_result_present:
+            LOGGER.debug('Slicing process has data!')
+            break
+        remaining_mins = MAX_TIME_SLICING_MINS - i
+        LOGGER.debug(f'Killing slicing process in {remaining_mins} minutes...')
+
+    if not slicing_result_present:
+        LOGGER.debug('Slicing did not terminate within the specified timespan, continuing...')
+        slicing_proc.terminate()
+        slicing_proc.join(timeout=10)
+        child_pipe.close()
+        parent_pipe.close()
+        return None
+
+    try:
+        slices = parent_pipe.recv()
+        parent_pipe.close()
+        slicing_proc.join()
+        return slices
+    except:
+        LOGGER.debug('Could not read slices from child process, continuing...')
+        parent_pipe.close()
+        return None
+
 
 def analyze_sink_type(tx, label, fn, args=()):
 
@@ -213,27 +255,8 @@ def analyze_sink_type(tx, label, fn, args=()):
             label = 'NON-REACH'
             LOGGER.debug('Current node is unreachable!')
 
-        LOGGER.debug('Getting program slices...')
-
-        parent_pipe, child_pipe = multiprocessing.Pipe()
-        slicing_proc = multiprocessing.Process(target=do_slicing, args=(child_pipe, arg_id_node['Code'], expr_node))
-        slicing_proc.start()
-
-        if not parent_pipe.poll(timeout=MAX_TIME_SLICING):
-            LOGGER.debug('Slicing did not terminate within the specified timespan, continuing...')
-            slicing_proc.terminate()
-            slicing_proc.join(timeout=10)
-            child_pipe.close()
-            parent_pipe.close()
-            continue
-
-        try:
-            slices = parent_pipe.recv()
-            parent_pipe.close()
-            slicing_proc.join()
-        except:
-            LOGGER.debug('Could not read slices from child process, continuing...')
-            parent_pipe.close()
+        slices = do_multiproc_slicing(arg_id_node, expr_node)
+        if not slices:
             continue
 
         LOGGER.debug(slices)
