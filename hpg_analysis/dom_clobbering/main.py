@@ -34,7 +34,7 @@ LOGGER.setLevel(logging.DEBUG)
 
 # Other constants
 
-MAX_TIME_SLICING_MINS = 30
+MAX_TIME_SLICING_MINS = 15
 
 SCRIPT_REGEX = re.compile('document\.createElement\([\'|"](script)[\'|"]\)')
 
@@ -216,7 +216,7 @@ def do_multiproc_slicing(arg_id_node, expr_node):
 
     slicing_result_present = False
     for i in range(0, MAX_TIME_SLICING_MINS):
-        slicing_result_present = parent_pipe.poll(60)
+        slicing_result_present = parent_pipe.poll(timeout=60.0)
         if slicing_result_present:
             LOGGER.debug('Slicing process has data!')
             break
@@ -257,6 +257,7 @@ def analyze_sink_type(tx, label, fn, args=()):
 
         slices = do_multiproc_slicing(arg_id_node, expr_node)
         if not slices:
+            LOGGER.debug('No slices, continuing...')
             continue
 
         LOGGER.debug(slices)
