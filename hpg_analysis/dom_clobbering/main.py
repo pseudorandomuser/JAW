@@ -56,9 +56,7 @@ def get_property_assignment_sinks(tx, property, obj=None):
     '''
         WHERE right_expr.Type = 'Identifier' OR right_expr.Type = 'MemberExpression'''
 
-    run_query(tx, query)
-
-    for r in db_result:
+    for r in run_query(tx, query):
         for arg_id_node in get_id_nodes(tx, r['right_expr']):
             yield (r['expr_node'], r['assign_expr'], r['right_expr'], arg_id_node)
 
@@ -89,9 +87,7 @@ def get_complex_call_sinks(tx, n_args, func, obj=None):
         RETURN expr_node, call_expr%s;
     ''' % (arg_node_query_slices, callee_props, callee_locator, callee_where, arg_node_returns)
 
-    run_query(tx, query)
-
-    for result in db_result:
+    for result in run_query(tx, query):
         expr_node = result['expr_node']
         call_expr = result['call_expr']
         for i in range(0, n_args):
