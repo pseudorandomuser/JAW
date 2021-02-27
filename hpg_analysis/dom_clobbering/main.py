@@ -35,6 +35,12 @@ LOGGER.setLevel(logging.DEBUG)
 SCRIPT_REGEX = re.compile('document\.createElement\([\'|"](script)[\'|"]\)')
 
 
+def run_query(tx, query):
+    LOGGER.debug(query)
+    r = tx.run(query)
+    LOGGER.debug('Query OK')
+    return r
+
 def get_property_assignment_sinks(tx, property, obj=None):
 
     obj_slice = ''
@@ -50,11 +56,7 @@ def get_property_assignment_sinks(tx, property, obj=None):
     '''
         WHERE right_expr.Type = 'Identifier' OR right_expr.Type = 'MemberExpression'''
 
-    LOGGER.debug(query)
-
-    db_result = tx.run(query)
-
-    LOGGER.debug('OK')
+    run_query(tx, query)
 
     for r in db_result:
         for arg_id_node in get_id_nodes(tx, r['right_expr']):
@@ -87,11 +89,7 @@ def get_complex_call_sinks(tx, n_args, func, obj=None):
         RETURN expr_node, call_expr%s;
     ''' % (arg_node_query_slices, callee_props, callee_locator, callee_where, arg_node_returns)
 
-    LOGGER.debug(query)
-
-    db_result = tx.run(query)
-
-    LOGGER.debug('OK')
+    run_query(tx, query)
 
     for result in db_result:
         expr_node = result['expr_node']
@@ -103,6 +101,7 @@ def get_complex_call_sinks(tx, n_args, func, obj=None):
 
 
 def get_id_nodes(tx, node):
+
     if node['Type'] == 'Identifier':
         yield node
     query = '''MATCH ({Id: "%s"})-[rels:AST_parentOf*1..10]->(id_node {Type: "Identifier"})
@@ -113,12 +112,13 @@ def get_id_nodes(tx, node):
         )
         RETURN id_node;
     ''' % node['Id']
-    LOGGER.debug(query)
-    for result in tx.run(query):
+
+    for result in run_query(tx, query):
         yield result['id_node']
 
 
 def get_vulnerable_source(tx, id):
+    
     query = '''MATCH (decl_node {Type: "VariableDeclarator"})
                 -[:AST_parentOf {RelationType: "id"}]->(id_node {Type: "Identifier"}), 
             (decl_node)-[:AST_parentOf*1..10]->(member_node {Type: "MemberExpression"})
@@ -126,8 +126,10 @@ def get_vulnerable_source(tx, id):
             (member_node)-[:AST_parentOf {RelationType: "property"}]->(prop_node) 
             RETURN decl_node, id_node, member_node, prop_node;
     ''' % id
-    for result in tx.run(query):
+
+    for result in run_query(tx, query):
         return result
+
     return None
 
 
@@ -202,10 +204,14 @@ def analyze_sink_type(tx, label, fn, args=()):
 
         LOGGER.debug('\n%s' * 4, repr(expr_node), repr(stmt_node), repr(arg_top_node), repr(arg_id_node))
 
+        LOGGER.debug('Begin reachability analysis...')
         if do_reachability_analysis(tx, node=expr_node) == 'unreachable':
             label = 'NON-REACH'
+            LOGGER.debug('Current node is unreachable!')
 
+        LOGGER.debug('Getting program slices...')
         slices = get_varname_value_from_context(arg_id_node['Code'], expr_node)
+        LOGGER.debug(slices)
         slices_format = [{
             'code': code, 
             'location': parse_location(location)
@@ -217,7 +223,9 @@ def analyze_sink_type(tx, label, fn, args=()):
         for code, args, ids, location in slices:
 
             if not source and 'window' in ids:
+                LOGGER.debug('Window is in slices, looking for vulnerable source...')
                 result = get_vulnerable_source(tx, ids['window'])
+                LOGGER.debug(result)
                 if result and result['prop_node']['Code'] not in WINDOW_PREDEFINED_PROPERTIES:
                     source = result
 
@@ -248,6 +256,7 @@ def analyze_sink_type(tx, label, fn, args=()):
 
 def run_analysis(out_path, make_json):
 
+    LOGGER.debug('Establishing database connection...')
     database = GraphDatabase.driver(
         constants.NEO4J_CONN_STRING, 
         auth=(
@@ -296,6 +305,8 @@ def run_analysis(out_path, make_json):
 
             for params in sink_types:
                 vulnerabilities += analyze_sink_type(tx, *params)
+
+            LOGGER.debug('Analysis finished, generating report...')
                 
             generate_report(vulnerabilities, out_path, make_json)
 
