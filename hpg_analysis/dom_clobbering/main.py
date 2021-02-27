@@ -4,9 +4,11 @@ import re
 import os
 import sys
 import json
+import time
 import logging
 import argparse
 import subprocess
+import multiprocessing
 
 from neo4j import GraphDatabase
 
@@ -31,6 +33,8 @@ LOGGER = logging.getLogger('dom-clobbering')
 LOGGER.setLevel(logging.DEBUG)
 
 # Other constants
+
+MAX_TIME_SLICING = 1800.0
 
 SCRIPT_REGEX = re.compile('document\.createElement\([\'|"](script)[\'|"]\)')
 
@@ -191,6 +195,10 @@ def generate_report(vulnerabilities, out_path, make_json):
     if report:
         report.close()
 
+def do_slicing(pipe, arg_node, expr_node):
+    slices = get_varname_value_from_context(arg_node, expr_node)
+    pipe.send(slices)
+    pipe.close()
 
 def analyze_sink_type(tx, label, fn, args=()):
 
@@ -206,8 +214,30 @@ def analyze_sink_type(tx, label, fn, args=()):
             LOGGER.debug('Current node is unreachable!')
 
         LOGGER.debug('Getting program slices...')
-        slices = get_varname_value_from_context(arg_id_node['Code'], expr_node)
+
+        parent_pipe, child_pipe = multiprocessing.Pipe()
+        slicing_proc = multiprocessing.Process(target=do_slicing, args=(child_pipe, arg_id_node['Code'], expr_node))
+        slicing_proc.start()
+
+        if not parent_pipe.poll(timeout=MAX_TIME_SLICING):
+            LOGGER.debug('Slicing did not terminate within the specified timespan, continuing...')
+            slicing_proc.terminate()
+            slicing_proc.join(timeout=10)
+            child_pipe.close()
+            parent_pipe.close()
+            continue
+
+        try:
+            slices = parent_pipe.recv()
+            parent_pipe.close()
+            slicing_proc.join()
+        except:
+            LOGGER.debug('Could not read slices from child process, continuing...')
+            parent_pipe.close()
+            continue
+
         LOGGER.debug(slices)
+
         slices_format = [{
             'code': code, 
             'location': parse_location(location)
