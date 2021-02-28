@@ -5,6 +5,7 @@ import time
 import psutil
 import random
 import logging
+import argparse
 import subprocess
 
 from concurrent.futures import ThreadPoolExecutor
@@ -17,8 +18,7 @@ LOGGER = logging.getLogger('batch_graph_construct')
 LOGGER.setLevel(logging.DEBUG)
 
 
-MAX_WORKERS = 32
-KILL_TIMEOUT = 60
+KILL_TIMEOUT_SECS = 60
 
 
 def graph_construction_worker(site_id, url_hash):
@@ -42,8 +42,8 @@ def graph_construction_worker(site_id, url_hash):
             LOGGER.debug(f'({site_id})({url_hash}) Detected CPG finished, breaking...')
             break
     
-    LOGGER.debug(f'({site_id})({url_hash}) Waiting {KILL_TIMEOUT} seconds for node to terminate...')
-    for i in range(0, KILL_TIMEOUT):
+    LOGGER.debug(f'({site_id})({url_hash}) Waiting {KILL_TIMEOUT_SECS} seconds for node to terminate...')
+    for i in range(0, KILL_TIMEOUT_SECS):
         if graph_proc.poll() is not None:
             LOGGER.debug(f'({site_id})({url_hash}) Node is already terminated, skipping timeout!')
             break
@@ -63,13 +63,14 @@ def graph_construction_worker(site_id, url_hash):
 
 if __name__ == '__main__':
 
-    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+    main_parser = argparse.ArgumentParser(description='Multithreaded Hybrid Property Graph Constructor')
+    main_parser.add_argument('--id',  metavar='id', type=int, help='ID of the website to construct graphs for', required=True)
+    main_parser.add_argument('--workers',  metavar='workers', type=int, help='ID of the website to construct graphs for', default=8)
+    args = main_parser.parse_args()
 
-        if (len(sys.argv) < 2):
-            print(f'Usage: f{sys.argv[0]} <site_id>')
-            sys.exit(-1)
+    with ThreadPoolExecutor(max_workers=args.workers) as executor:
 
-        site_id = sys.argv[1]
+        site_id = str(args.id)
         site_path = os.path.join(constants.CLOBBER_DATA, site_id)
 
         if not os.path.isdir(site_path):

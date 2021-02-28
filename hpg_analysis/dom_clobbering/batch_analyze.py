@@ -3,6 +3,7 @@ import sys
 import json
 import time
 import random
+import argparse
 import traceback
 import importlib
 import subprocess
@@ -46,11 +47,12 @@ def graph_import(site_id, url_hash):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) < 2:
-        print(f'Usage: {sys.argv[0]} <site_id>')
-        sys.exit(-1)
+
+    main_parser = argparse.ArgumentParser(description='Batch Hybrid Property Graph Analyzer')
+    main_parser.add_argument('--id',  metavar='id', type=int, help='ID of the website to analyze', required=True)
+    args = main_parser.parse_args()
     
-    site_id = sys.argv[1]
+    site_id = str(args.id)
     site_path = os.path.join(constants.CLOBBER_DATA, site_id)
 
     if os.path.isdir(site_path):
