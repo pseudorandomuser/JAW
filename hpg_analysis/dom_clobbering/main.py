@@ -215,13 +215,17 @@ def do_multiproc_slicing(arg_id_node, expr_node):
     slicing_proc.start()
 
     slicing_result_present = False
-    for i in range(0, MAX_TIME_SLICING_MINS):
-        slicing_result_present = parent_pipe.poll(timeout=60.0)
-        if slicing_result_present:
-            LOGGER.debug('Slicing process has data!')
-            break
-        remaining_mins = MAX_TIME_SLICING_MINS - i
-        LOGGER.debug(f'Killing slicing process in {remaining_mins} minutes...')
+
+    try:
+        for i in range(0, MAX_TIME_SLICING_MINS):
+            slicing_result_present = parent_pipe.poll(timeout=60.0)
+            if slicing_result_present:
+                LOGGER.debug('Slicing process has data!')
+                break
+            remaining_mins = MAX_TIME_SLICING_MINS - i
+            LOGGER.debug(f'Killing slicing process in {remaining_mins} minutes...')
+    except KeyboardInterrupt:
+        LOGGER.debug('User aborted current slicing process...')
 
     if not slicing_result_present:
         LOGGER.debug('Slicing did not terminate within the specified timespan, continuing...')
