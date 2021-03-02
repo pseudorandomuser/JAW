@@ -20,7 +20,7 @@ from neo4j.exceptions import ServiceUnavailable
 
 NUM_ANALYZE_URLS = 22
 MAX_RETRIES = 1
-FAIL_DELAY = 10
+FAIL_DELAY = 1
 
 
 def graph_import(site_id, url_hash):

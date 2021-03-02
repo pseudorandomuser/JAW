@@ -35,8 +35,9 @@ LOGGER.setLevel(logging.DEBUG)
 
 # Other constants
 
-MAX_TIME_SLICING_MINS = 5
-MAX_QUERY_TIME_MINS = 5
+MAX_SLICING_TIME_MINS = 5
+MAX_QUERY_TIME_MINS = 2
+MAX_REACH_TIME_MINS = 1
 
 SCRIPT_REGEX = re.compile('document\.createElement\([\'|"](script)[\'|"]\)')
 
@@ -52,7 +53,7 @@ def run_query(tx, query):
         r = tx.run(query)
         LOGGER.debug('Query OK')
         return r
-    except Exception as exc:
+    except:
         LOGGER.debug('Query could not be executed due to an exception: ')
         LOGGER.debug(traceback.format_exc())
         return []
@@ -222,20 +223,27 @@ def analyze_sink_type(tx, label, fn, args=()):
 
         LOGGER.debug('\n%s' * 4, repr(expr_node), repr(stmt_node), repr(arg_top_node), repr(arg_id_node))
 
+        signal.alarm(MAX_REACH_TIME_MINS * 60)
         LOGGER.debug('Begin reachability analysis...')
-        if do_reachability_analysis(tx, node=expr_node) == 'unreachable':
-            label = 'NON-REACH'
-            LOGGER.debug('Current node is unreachable!')
+        try:
+            if do_reachability_analysis(tx, node=expr_node) == 'unreachable':
+                label = 'NON-REACH'
+                LOGGER.debug('Current node is unreachable!')
+        except:
+            LOGGER.debug('Could not determine reachability due to an exception:')
+            LOGGER.debug(traceback.format_exc())
+        finally:
+            signal.alarm(0)
 
-        signal.alarm(MAX_TIME_SLICING_MINS * 60)
-        LOGGER.debug(f'Attempting program slicing, aborting in {MAX_TIME_SLICING_MINS} minutes...')
+        signal.alarm(MAX_SLICING_TIME_MINS * 60)
+        LOGGER.debug(f'Attempting program slicing, aborting in {MAX_SLICING_TIME_MINS} minutes...')
 
         try:
             slices = get_varname_value_from_context(arg_id_node['Code'], expr_node)
             if not slices:
                 LOGGER.debug('Slices empty, skipping...')
                 continue
-        except Exception as exc:
+        except:
             LOGGER.debug('Slicing was aborted due to an exception:')
             LOGGER.debug(traceback.format_exc())
             continue
@@ -288,6 +296,9 @@ def analyze_sink_type(tx, label, fn, args=()):
 
 def run_analysis(out_path, make_json):
 
+    #Define signal handler
+    signal.signal(signal.SIGALRM, signal_handler)
+
     LOGGER.debug('Establishing database connection...')
     database = GraphDatabase.driver(
         constants.NEO4J_CONN_STRING, 
@@ -298,6 +309,7 @@ def run_analysis(out_path, make_json):
     )
 
     with database.session() as session:
+
         with session.begin_transaction() as tx:
 
             vulnerabilities = []
@@ -392,9 +404,6 @@ def import_site_data(site_id=0, url_id=None, url=None, generate_only=False, over
 
 
 if __name__ == '__main__':
-
-    # Register signal handler
-    signal.signal(signal.SIGALRM, signal_handler)
 
     jaw_data_path = os.path.join(constants.BASE_DIR, f'..{os.path.sep}JAWData')
 
