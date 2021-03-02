@@ -5,10 +5,11 @@ import os
 import sys
 import json
 import time
+import signal
 import logging
 import argparse
+import traceback
 import subprocess
-import multiprocessing
 
 from neo4j import GraphDatabase
 
@@ -34,16 +35,29 @@ LOGGER.setLevel(logging.DEBUG)
 
 # Other constants
 
-MAX_TIME_SLICING_MINS = 10
+MAX_TIME_SLICING_MINS = 5
+MAX_QUERY_TIME_MINS = 5
 
 SCRIPT_REGEX = re.compile('document\.createElement\([\'|"](script)[\'|"]\)')
 
 
+def signal_handler(signum, frame):
+    raise Exception('Time budget exceeded!')
+
+
 def run_query(tx, query):
     LOGGER.debug(query)
-    r = tx.run(query)
-    LOGGER.debug('Query OK')
-    return r
+    signal.alarm(MAX_QUERY_TIME_MINS * 60)
+    try:
+        r = tx.run(query)
+        LOGGER.debug('Query OK')
+        return r
+    except Exception as exc:
+        LOGGER.debug('Query could not be executed due to an exception: ')
+        LOGGER.debug(traceback.format_exc())
+        return []
+    finally:
+        signal.alarm(0)
 
 
 def get_property_assignment_sinks(tx, property, obj=None):
@@ -200,52 +214,6 @@ def generate_report(vulnerabilities, out_path, make_json):
         report.close()
 
 
-def slicing_routine(pipe, arg_node, expr_node):
-    LOGGER.debug(f'Spawned slicing process with PID {os.getpid()}')
-    slices = get_varname_value_from_context(arg_node, expr_node)
-    pipe.send(slices)
-    pipe.close()
-
-
-def do_multiproc_slicing(arg_id_node, expr_node):
-    LOGGER.debug(f'Spawning slicing process from PID {os.getpid()}...')
-
-    parent_pipe, child_pipe = multiprocessing.Pipe()
-    slicing_proc = multiprocessing.Process(target=slicing_routine, args=(child_pipe, arg_id_node['Code'], expr_node))
-    slicing_proc.start()
-
-    slicing_result_present = False
-
-    try:
-        for i in range(0, MAX_TIME_SLICING_MINS):
-            slicing_result_present = parent_pipe.poll(timeout=60.0)
-            if slicing_result_present:
-                LOGGER.debug('Slicing process has data!')
-                break
-            remaining_mins = MAX_TIME_SLICING_MINS - i
-            LOGGER.debug(f'Killing slicing process in {remaining_mins} minutes...')
-    except KeyboardInterrupt:
-        LOGGER.debug('User aborted current slicing process...')
-
-    if not slicing_result_present:
-        LOGGER.debug('Slicing did not terminate within the specified timespan, continuing...')
-        slicing_proc.terminate()
-        slicing_proc.join(timeout=10)
-        child_pipe.close()
-        parent_pipe.close()
-        return None
-
-    try:
-        slices = parent_pipe.recv()
-        parent_pipe.close()
-        slicing_proc.join()
-        return slices
-    except:
-        LOGGER.debug('Could not read slices from child process, continuing...')
-        parent_pipe.close()
-        return None
-
-
 def analyze_sink_type(tx, label, fn, args=()):
 
     vulnerabilities = []
@@ -259,10 +227,20 @@ def analyze_sink_type(tx, label, fn, args=()):
             label = 'NON-REACH'
             LOGGER.debug('Current node is unreachable!')
 
-        slices = do_multiproc_slicing(arg_id_node, expr_node)
-        if not slices:
-            LOGGER.debug('No slices, continuing...')
+        signal.alarm(MAX_TIME_SLICING_MINS * 60)
+        LOGGER.debug(f'Attempting program slicing, aborting in {MAX_TIME_SLICING_MINS} minutes...')
+
+        try:
+            slices = get_varname_value_from_context(arg_id_node['Code'], expr_node)
+            if not slices:
+                LOGGER.debug('Slices empty, skipping...')
+                continue
+        except Exception as exc:
+            LOGGER.debug('Slicing was aborted due to an exception:')
+            LOGGER.debug(traceback.format_exc())
             continue
+        finally:
+            signal.alarm(0)
 
         LOGGER.debug(slices)
 
@@ -414,6 +392,9 @@ def import_site_data(site_id=0, url_id=None, url=None, generate_only=False, over
 
 
 if __name__ == '__main__':
+
+    # Register signal handler
+    signal.signal(signal.SIGALRM, signal_handler)
 
     jaw_data_path = os.path.join(constants.BASE_DIR, f'..{os.path.sep}JAWData')
 
