@@ -34,7 +34,7 @@ LOGGER.setLevel(logging.DEBUG)
 
 # Other constants
 
-MAX_TIME_SLICING_MINS = 15
+MAX_TIME_SLICING_MINS = 10
 
 SCRIPT_REGEX = re.compile('document\.createElement\([\'|"](script)[\'|"]\)')
 

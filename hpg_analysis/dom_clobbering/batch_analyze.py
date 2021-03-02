@@ -59,10 +59,10 @@ if __name__ == '__main__':
         print(f'Analyzing URLs for site ID: {site_id}')
 
         reports_path = os.path.join(constants.CLOBBER_ROOT, 'reports')
-        report_path = os.path.join(reports_path, site_id)
+        site_reports_path = os.path.join(reports_path, site_id)
 
-        if not os.path.isdir(report_path):
-            os.makedirs(report_path)
+        if not os.path.isdir(site_reports_path):
+            os.makedirs(site_reports_path)
 
         parse_path = os.path.join(constants.CLOBBER_ROOT, 'parse.json')
         parse_handle = open(parse_path, 'r')
@@ -73,7 +73,8 @@ if __name__ == '__main__':
             print(f'Site with ID {site_id} is not in the allowed set.')
             sys.exit(-2)
 
-        url_hashes = parse_dict[site_id]
+        url_hashes = [ hash for hash in parse_dict[site_id] if not
+            os.path.isfile(os.path.join(site_reports_path, f'{hash}.txt')) ]
 
         num_success = 0
 
@@ -81,7 +82,7 @@ if __name__ == '__main__':
 
             url_hash = random.choice(url_hashes)
             url_hashes.remove(url_hash)
-            url_report_path = os.path.join(report_path, f'{url_hash}.txt')
+            url_report_path = os.path.join(site_reports_path, f'{url_hash}.txt')
 
             print(f'Importing URL with hash {url_hash}...')
             if not graph_import(site_id, url_hash):
